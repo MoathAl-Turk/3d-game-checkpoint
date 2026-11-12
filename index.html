@@ -3,21 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Checkpoint Game</title>
+    <title>3D Parkour Game</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; background: #111; }
-        #ui {
-            position: absolute;
+        
+        /* Slide-out Menu Container */
+        #ui-container {
+            position: fixed;
+            right: -280px; /* Hidden off-screen by default */
             top: 20px;
-            left: 20px;
-            color: white;
+            width: 250px;
+            transition: right 0.3s ease-in-out;
             z-index: 10;
+        }
+        
+        /* Class added by JS to slide it open */
+        #ui-container.open { right: 20px; }
+
+        /* The Gear Toggle Button */
+        #settings-toggle {
+            position: absolute;
+            left: -45px;
+            top: 0;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            border: none;
+            padding: 12px;
+            cursor: pointer;
+            border-radius: 8px 0 0 8px;
+            font-size: 20px;
+        }
+
+        #ui {
             background: rgba(0,0,0,0.8);
             padding: 15px;
-            border-radius: 8px;
+            border-radius: 0 8px 8px 8px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            width: 250px;
+            color: white;
         }
+
         button {
             border: none;
             padding: 10px 15px;
@@ -33,13 +57,19 @@
         #login-btn { background: #4285F4; color: white; }
         #login-btn:hover { background: #357ae8; }
         #logout-btn { background: #ff4444; color: white; display: none; }
-        #logout-btn:hover { background: #cc0000; }
-        #status { color: #00ff88; font-size: 13px; margin-top: 10px; word-break: break-all; }
-        #user-info { font-size: 12px; color: #aaa; margin-top: 8px; }
         
+        #status { color: #00ff88; font-size: 13px; margin-top: 10px; }
+        #user-info { font-size: 12px; color: #aaa; margin-top: 8px; }
         #auth-section { margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 10px; }
-        .char-select-container { margin-bottom: 15px; }
         select { width: 100%; padding: 8px; margin-top: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; }
+        
+        /* Crosshair/Target dot for center of screen */
+        #crosshair {
+            position: absolute; top: 50%; left: 50%;
+            width: 6px; height: 6px; background: white;
+            border-radius: 50%; transform: translate(-50%, -50%);
+            pointer-events: none; opacity: 0.5;
+        }
     </style>
 
     <script type="importmap">
@@ -55,30 +85,35 @@
     </script>
 </head>
 <body>
-    <div id="ui">
-        <h2 style="margin-top: 0;">3D Game Sandbox</h2>
-        <p style="font-size: 13px; color: #ccc;">Use WASD or Arrow Keys</p>
-        
-        <div id="auth-section">
-            <button id="login-btn">Sign in with Google</button>
-            <button id="logout-btn">Log Out</button>
-            <p id="user-info">Not logged in</p>
-        </div>
+    <div id="crosshair"></div>
 
-        <div class="char-select-container">
-            <label for="char-select" style="font-size: 13px; color: #ccc;">Choose Character:</label>
-            <select id="char-select">
-                <option value="Casual_Male.gltf">Casual Male</option>
-                <option value="Casual_Female.gltf">Casual Female</option>
-                <option value="Pirate_Male.gltf">Pirate Male</option>
-                <option value="Pirate_Female.gltf">Pirate Female</option>
-                <option value="Zombie_Male.gltf">Zombie Male</option>
-            </select>
-        </div>
+    <div id="ui-container">
+        <button id="settings-toggle">⚙️</button>
+        <div id="ui">
+            <h2 style="margin-top: 0; font-size: 18px;">Game Settings</h2>
+            <p style="font-size: 12px; color: #ccc;">WASD to Move | SPACE to Jump</p>
+            
+            <div id="auth-section">
+                <button id="login-btn">Sign in with Google</button>
+                <button id="logout-btn">Log Out</button>
+                <p id="user-info">Not logged in</p>
+            </div>
 
-        <button id="save-btn" class="action-btn">Save Progress</button>
-        <button id="load-btn" class="action-btn">Load Checkpoint</button>
-        <p id="status">Ready.</p>
+            <div style="margin-bottom: 15px;">
+                <label for="char-select" style="font-size: 13px; color: #ccc;">Choose Character:</label>
+                <select id="char-select">
+                    <option value="Casual_Male.gltf">Casual Male</option>
+                    <option value="Casual_Female.gltf">Casual Female</option>
+                    <option value="Pirate_Male.gltf">Pirate Male</option>
+                    <option value="Pirate_Female.gltf">Pirate Female</option>
+                    <option value="Zombie_Male.gltf">Zombie Male</option>
+                </select>
+            </div>
+
+            <button id="save-btn" class="action-btn">Save Checkpoint</button>
+            <button id="load-btn" class="action-btn">Load Checkpoint</button>
+            <p id="status">Ready.</p>
+        </div>
     </div>
 
     <script type="module" src="script.js"></script>
