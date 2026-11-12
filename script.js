@@ -5,12 +5,12 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signO
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCe3tkeCGCaxg6P5YAWtyuPFTGt02a6QZQ",
-  authDomain: "d-game-checkpoints.firebaseapp.com",
-  projectId: "d-game-checkpoints",
-  storageBucket: "d-game-checkpoints.firebasestorage.app",
-  messagingSenderId: "68575491787",
-  appId: "1:68575491787:web:1811cbf860460b55ddcd4e"
+  apiKey: "AIzaSyCe3tkeCGCaxg6P5YAWtyuPFTGt02a6QZQ",
+  authDomain: "d-game-checkpoints.firebaseapp.com",
+  projectId: "d-game-checkpoints",
+  storageBucket: "d-game-checkpoints.firebasestorage.app",
+  messagingSenderId: "68575491787",
+  appId: "1:68575491787:web:1811cbf860460b55ddcd4e"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -54,8 +54,6 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 8, 10);
-camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -71,16 +69,21 @@ const gridHelper = new THREE.GridHelper(40, 40, 0x888888, 0x444444);
 scene.add(gridHelper);
 
 // --- LOAD 3D CHARACTER ---
-let player = null;
+let player = new THREE.Group(); 
+scene.add(player);
+
+let currentModel = null;
 let mixer = null; 
+let idleAction = null;
+let walkAction = null;
 const clock = new THREE.Clock(); 
 const loader = new GLTFLoader();
 
-let currentModelPath = "Casual_Male.gltf"; // Default
+let currentModelPath = "Casual_Male.gltf";
 
 function loadCharacter(modelPath, spawnPosition = {x: 0, y: 0, z: 0}) {
-    if (player) {
-        scene.remove(player); // Remove old character
+    if (currentModel) {
+        player.remove(currentModel);
     }
 
     statusEl.innerText = "Loading character...";
@@ -88,15 +91,36 @@ function loadCharacter(modelPath, spawnPosition = {x: 0, y: 0, z: 0}) {
     document.getElementById('char-select').value = modelPath;
 
     loader.load(modelPath, (gltf) => {
-        player = gltf.scene;
-        player.scale.set(1, 1, 1); 
+        currentModel = gltf.scene;
+        player.add(currentModel);
         player.position.set(spawnPosition.x, spawnPosition.y, spawnPosition.z);
-        scene.add(player);
 
         if (gltf.animations.length > 0) {
-            mixer = new THREE.AnimationMixer(player);
-            const action = mixer.clipAction(gltf.animations[0]);
-            action.play();
+            mixer = new THREE.AnimationMixer(currentModel);
+            idleAction = null;
+            walkAction = null;
+            
+            console.log(`--- Animations for ${modelPath} ---`);
+            
+            gltf.animations.forEach((clip) => {
+                console.log("Found animation:", clip.name); // Check F12 Console to see these!
+                const name = clip.name.toLowerCase();
+                
+                if (name.includes('idle')) idleAction = mixer.clipAction(clip);
+                if (name.includes('walk') || name.includes('run')) walkAction = mixer.clipAction(clip);
+            });
+            
+            // If it couldn't find an exact "Idle", pick the first animation that IS NOT falling or dying
+            if (!idleAction) {
+                const safeClip = gltf.animations.find(c => {
+                    const n = c.name.toLowerCase();
+                    return !n.includes('death') && !n.includes('defeat') && !n.includes('fall');
+                }) || gltf.animations[0]; // Absolute last resort fallback
+                
+                idleAction = mixer.clipAction(safeClip);
+            }
+            
+            if (idleAction) idleAction.play();
         }
         
         statusEl.innerText = "Character ready!";
@@ -106,10 +130,8 @@ function loadCharacter(modelPath, spawnPosition = {x: 0, y: 0, z: 0}) {
     });
 }
 
-// Load default character initially
 loadCharacter(currentModelPath);
 
-// Handle dropdown changes
 document.getElementById('char-select').addEventListener('change', (e) => {
     const currentPos = player ? player.position : {x: 0, y: 0, z: 0};
     loadCharacter(e.target.value, currentPos);
@@ -117,17 +139,28 @@ document.getElementById('char-select').addEventListener('change', (e) => {
 
 // --- CONTROLS & MOVEMENT ---
 const keys = {};
+let isMoving = false;
 window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
 window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
 
 function updatePlayer() {
-    if (!player) return;
+    if (!currentModel) return;
 
     const speed = 0.08;
-    if (keys['w'] || keys['arrowup']) { player.position.z -= speed; player.rotation.y = Math.PI; }
-    if (keys['s'] || keys['arrowdown']) { player.position.z += speed; player.rotation.y = 0; }
-    if (keys['a'] || keys['arrowleft']) { player.position.x -= speed; player.rotation.y = -Math.PI / 2; }
-    if (keys['d'] || keys['arrowright']) { player.position.x += speed; player.rotation.y = Math.PI / 2; }
+    isMoving = false;
+
+    if (keys['w'] || keys['arrowup']) { player.position.z -= speed; player.rotation.y = Math.PI; isMoving = true; }
+    if (keys['s'] || keys['arrowdown']) { player.position.z += speed; player.rotation.y = 0; isMoving = true; }
+    if (keys['a'] || keys['arrowleft']) { player.position.x -= speed; player.rotation.y = -Math.PI / 2; isMoving = true; }
+    if (keys['d'] || keys['arrowright']) { player.position.x += speed; player.rotation.y = Math.PI / 2; isMoving = true; }
+
+    if (isMoving && walkAction && !walkAction.isRunning()) {
+        if (idleAction) idleAction.stop();
+        walkAction.play();
+    } else if (!isMoving && idleAction && !idleAction.isRunning()) {
+        if (walkAction) walkAction.stop();
+        idleAction.play();
+    }
 }
 
 // --- GAME LOOP ---
@@ -135,7 +168,15 @@ function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
     if (mixer) mixer.update(delta);
+    
     updatePlayer();
+
+    // Isometric Camera Follow
+    camera.position.x = player.position.x;
+    camera.position.z = player.position.z + 10; 
+    camera.position.y = player.position.y + 8;
+    camera.lookAt(player.position);
+
     renderer.render(scene, camera);
 }
 animate();
@@ -148,7 +189,7 @@ window.addEventListener('resize', () => {
 
 // --- FIREBASE SAVE & LOAD ---
 document.getElementById('save-btn').addEventListener('click', async () => {
-    if (!currentUserId || !player) return;
+    if (!currentUserId || !currentModel) return;
     
     statusEl.innerText = "Saving to Firebase...";
     try {
@@ -157,7 +198,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
             x: player.position.x,
             y: player.position.y,
             z: player.position.z,
-            model: currentModelPath, // Save the selected character
+            model: currentModelPath, 
             lastUpdated: new Date().toISOString()
         }, { merge: true });
         
@@ -178,7 +219,6 @@ document.getElementById('load-btn').addEventListener('click', async () => {
         
         if (docSnap.exists()) {
             const data = docSnap.data();
-            // Load the saved character at the saved position
             loadCharacter(data.model || "Casual_Male.gltf", {x: data.x, y: data.y, z: data.z});
         } else {
             statusEl.innerText = "No save found.";
