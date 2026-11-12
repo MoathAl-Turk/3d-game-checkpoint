@@ -2,14 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Parkour Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=none">
+    <title>3D Parkour & Boss Game</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; background: #111; }
+        /* Prevent pull-to-refresh and zooming on mobile */
+        body { margin: 0; overflow: hidden; font-family: sans-serif; background: #111; touch-action: none; user-select: none; }
         
         #ui-container {
             position: fixed;
-            right: -260px; /* Hidden off-screen */
+            right: -260px;
             top: 20px;
             width: 260px;
             transition: right 0.3s ease-in-out;
@@ -18,10 +19,9 @@
         
         #ui-container.open { right: 20px; }
 
-        /* Fixed Gear Toggle */
         #settings-toggle {
             position: absolute;
-            left: -40px; /* Pushed perfectly outside the menu */
+            left: -40px; 
             top: 0;
             width: 40px;
             height: 40px;
@@ -46,16 +46,7 @@
             color: white;
         }
 
-        button {
-            border: none;
-            padding: 10px 15px;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 4px;
-            margin-top: 8px;
-            display: block;
-            width: 100%;
-        }
+        button { border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 8px; display: block; width: 100%; }
         .action-btn { background: #00ff88; color: black; }
         .action-btn:hover { background: #00cc6a; }
         #login-btn { background: #4285F4; color: white; }
@@ -65,6 +56,58 @@
         #user-info { font-size: 12px; color: #aaa; margin-top: 8px; }
         #auth-section { margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 10px; }
         select { width: 100%; padding: 8px; margin-top: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; }
+
+        /* --- MOBILE TOUCH CONTROLS --- */
+        #mobile-controls {
+            display: none; /* Hidden on desktop by default */
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let touches pass through empty space */
+            z-index: 5;
+        }
+
+        .m-btn {
+            background: rgba(0, 0, 0, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            color: white;
+            border-radius: 50%;
+            pointer-events: auto; /* Re-enable touches just for buttons */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+        .m-btn:active { background: rgba(255, 255, 255, 0.4); }
+
+        #dpad {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: grid;
+            grid-template-columns: 60px 60px 60px;
+            grid-template-rows: 60px 60px 60px;
+            gap: 5px;
+        }
+        #btn-up { grid-column: 2; grid-row: 1; }
+        #btn-left { grid-column: 1; grid-row: 2; }
+        #btn-right { grid-column: 3; grid-row: 2; }
+        #btn-down { grid-column: 2; grid-row: 3; }
+
+        #action-pad {
+            position: absolute;
+            bottom: 30px;
+            right: 20px;
+            display: flex;
+            gap: 15px;
+        }
+        #action-pad .m-btn { width: 70px; height: 70px; font-size: 24px; border-radius: 12px; }
+
+        /* Show mobile controls only on mobile devices/small screens */
+        @media (max-width: 800px) {
+            #mobile-controls { display: block; }
+        }
     </style>
 
     <script type="importmap">
@@ -80,6 +123,21 @@
     </script>
 </head>
 <body>
+    <!-- MOBILE CONTROLS -->
+    <div id="mobile-controls">
+        <div id="dpad">
+            <div id="btn-up" class="m-btn">▲</div>
+            <div id="btn-left" class="m-btn">◀</div>
+            <div id="btn-right" class="m-btn">▶</div>
+            <div id="btn-down" class="m-btn">▼</div>
+        </div>
+        <div id="action-pad">
+            <div id="btn-punch" class="m-btn">👊</div>
+            <div id="btn-jump" class="m-btn">⬆️</div>
+        </div>
+    </div>
+
+    <!-- SETTINGS UI -->
     <div id="ui-container">
         <button id="settings-toggle">⚙️</button>
         <div id="ui">
