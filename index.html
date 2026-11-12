@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Checkpoint Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; background: #111; }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            z-index: 10;
+            background: rgba(0,0,0,0.6);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        button {
+            background: #00ff88;
+            border: none;
+            padding: 10px 15px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+        button:hover { background: #00cc6a; }
+    </style>
+    <!-- Import Three.js via CDN -->
+    <script type="importmap">
+        {
+          "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+          }
+        }
+    </script>
+</head>
+<body>
+    <div id="ui">
+        <h2>3D Game Sandbox</h2>
+        <p>Use Arrow Keys or WASD to move cube</p>
+        <button id="save-btn">Save Progress to Firebase</button>
+        <button id="load-btn">Load Checkpoint</button>
+        <p id="status" style="color: #00ff88; font-size: 14px; margin-top: 10px;"></p>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
