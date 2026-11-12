@@ -12,9 +12,10 @@
             left: 20px;
             color: white;
             z-index: 10;
-            background: rgba(0,0,0,0.6);
+            background: rgba(0,0,0,0.7);
             padding: 15px;
             border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
         button {
             background: #00ff88;
@@ -23,16 +24,22 @@
             font-weight: bold;
             cursor: pointer;
             border-radius: 4px;
-            margin-top: 5px;
+            margin-top: 8px;
+            display: block;
+            width: 100%;
         }
         button:hover { background: #00cc6a; }
+        #status { color: #00ff88; font-size: 13px; margin-top: 10px; word-break: break-all; }
     </style>
-    <!-- Import Three.js via CDN -->
+
+    <!-- Import Map for Three.js and Firebase SDKs -->
     <script type="importmap">
         {
           "imports": {
             "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+            "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+            "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
           }
         }
     </script>
@@ -40,10 +47,10 @@
 <body>
     <div id="ui">
         <h2>3D Game Sandbox</h2>
-        <p>Use Arrow Keys or WASD to move cube</p>
+        <p>Use WASD or Arrow Keys to move</p>
         <button id="save-btn">Save Progress to Firebase</button>
         <button id="load-btn">Load Checkpoint</button>
-        <p id="status" style="color: #00ff88; font-size: 14px; margin-top: 10px;"></p>
+        <p id="status">Ready.</p>
     </div>
 
     <script type="module" src="script.js"></script>
