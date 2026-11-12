@@ -76,7 +76,7 @@ let mixer = null;
 const clock = new THREE.Clock(); 
 const loader = new GLTFLoader();
 
-let currentModelPath = "assets/Casual_Male.gltf"; // Default
+let currentModelPath = "Casual_Male.gltf"; // Default
 
 function loadCharacter(modelPath, spawnPosition = {x: 0, y: 0, z: 0}) {
     if (player) {
@@ -179,7 +179,7 @@ document.getElementById('load-btn').addEventListener('click', async () => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             // Load the saved character at the saved position
-            loadCharacter(data.model || "assets/Casual_Male.gltf", {x: data.x, y: data.y, z: data.z});
+            loadCharacter(data.model || "Casual_Male.gltf", {x: data.x, y: data.y, z: data.z});
         } else {
             statusEl.innerText = "No save found.";
         }
