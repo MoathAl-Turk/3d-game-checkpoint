@@ -232,12 +232,24 @@ function loadCharacter(modelPath, spawnPos = currentSpawn) {
             mixer = new THREE.AnimationMixer(currentModel);
             idleAction = null; walkAction = null; punchAction = null; deathAction = null;
             
+            console.log(`\n--- ANIMATIONS INSIDE ${modelPath} ---`);
+            
             gltf.animations.forEach((clip) => {
                 const name = clip.name.toLowerCase();
+                console.log("Found:", clip.name); // Prints the exact name to F12 Console
+                
                 if (name.includes('idle')) idleAction = mixer.clipAction(clip);
                 if (name.includes('walk') || name.includes('run')) walkAction = mixer.clipAction(clip);
-                if (name.includes('punch') || name.includes('attack')) punchAction = mixer.clipAction(clip);
-                if (name.includes('death') || name.includes('defeat')) deathAction = mixer.clipAction(clip);
+                
+                // Broader search for Punching
+                if (name.includes('punch') || name.includes('attack') || name.includes('hit') || name.includes('strike')) {
+                    punchAction = mixer.clipAction(clip);
+                }
+                
+                // Broader search for Dying
+                if (name.includes('death') || name.includes('defeat') || name.includes('die') || name.includes('down')) {
+                    deathAction = mixer.clipAction(clip);
+                }
             });
             
             if (!idleAction) idleAction = mixer.clipAction(gltf.animations[0]);
