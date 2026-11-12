@@ -12,13 +12,13 @@
             left: 20px;
             color: white;
             z-index: 10;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.8);
             padding: 15px;
             border-radius: 8px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            width: 250px;
         }
         button {
-            background: #00ff88;
             border: none;
             padding: 10px 15px;
             font-weight: bold;
@@ -28,8 +28,20 @@
             display: block;
             width: 100%;
         }
-        button:hover { background: #00cc6a; }
+        .action-btn { background: #00ff88; color: black; }
+        .action-btn:hover { background: #00cc6a; }
+        #login-btn { background: #4285F4; color: white; }
+        #login-btn:hover { background: #357ae8; }
+        #logout-btn { background: #ff4444; color: white; display: none; }
+        #logout-btn:hover { background: #cc0000; }
         #status { color: #00ff88; font-size: 13px; margin-top: 10px; word-break: break-all; }
+        #user-info { font-size: 12px; color: #aaa; margin-top: 8px; }
+        
+        #auth-section {
+            margin-bottom: 15px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
     </style>
 
     <!-- Import Map for Three.js and Firebase SDKs -->
@@ -39,17 +51,26 @@
             "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
             "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
             "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-            "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
+            "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
+            "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"
           }
         }
     </script>
 </head>
 <body>
     <div id="ui">
-        <h2>3D Game Sandbox</h2>
-        <p>Use WASD or Arrow Keys to move</p>
-        <button id="save-btn">Save Progress to Firebase</button>
-        <button id="load-btn">Load Checkpoint</button>
+        <h2 style="margin-top: 0;">3D Game Sandbox</h2>
+        <p style="font-size: 13px; color: #ccc;">Use WASD or Arrow Keys to move</p>
+        
+        <!-- Authentication UI -->
+        <div id="auth-section">
+            <button id="login-btn">Sign in with Google</button>
+            <button id="logout-btn">Log Out</button>
+            <p id="user-info">Not logged in</p>
+        </div>
+
+        <button id="save-btn" class="action-btn">Save Progress</button>
+        <button id="load-btn" class="action-btn">Load Checkpoint</button>
         <p id="status">Ready.</p>
     </div>
 
