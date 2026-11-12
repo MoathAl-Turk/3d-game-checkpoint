@@ -232,21 +232,22 @@ function loadCharacter(modelPath, spawnPos = currentSpawn) {
             mixer = new THREE.AnimationMixer(currentModel);
             idleAction = null; walkAction = null; punchAction = null; deathAction = null;
             
+            // Bulletproof search (ignores caps and spaces)
             gltf.animations.forEach((clip) => {
-                if (clip.name === 'Idle') idleAction = mixer.clipAction(clip);
-                if (clip.name === 'Walk' || clip.name === 'Run') walkAction = mixer.clipAction(clip);
-                if (clip.name === 'Punch') punchAction = mixer.clipAction(clip);
-                if (clip.name === 'Death') deathAction = mixer.clipAction(clip);
+                const n = clip.name.toLowerCase().trim();
+                if (n === 'idle') idleAction = mixer.clipAction(clip);
+                if (n === 'walk' || n === 'run') walkAction = mixer.clipAction(clip);
+                if (n === 'punch') punchAction = mixer.clipAction(clip);
+                if (n === 'death' || n === 'defeat') deathAction = mixer.clipAction(clip);
             });
             
             if (!idleAction) idleAction = mixer.clipAction(gltf.animations[0]);
             
-            if (punchAction) {
-                punchAction.setLoop(THREE.LoopOnce, 1);
-            }
+            // Force Punch and Death to only play exactly ONE time
+            if (punchAction) punchAction.setLoop(THREE.LoopOnce, 1);
             if (deathAction) {
                 deathAction.setLoop(THREE.LoopOnce, 1);
-                deathAction.clampWhenFinished = true; 
+                deathAction.clampWhenFinished = true; // Stay on the ground!
             }
             
             idleAction.play();
@@ -257,14 +258,18 @@ document.getElementById('char-select').addEventListener('change', (e) => loadCha
 
 // --- ACTION TRIGGERS ---
 function attemptPunch() {
-    if (currentLevel !== 2 || !boss || isDead || isPunching) return;
+    if (isDead || isPunching) return; // Unlocked! You can now punch ANYWHERE!
     
+    // Play Punch Animation 
     if (punchAction && mixer) {
         isPunching = true;
-        mixer.stopAllAction(); 
+        if (walkAction) walkAction.stop();
+        if (idleAction) idleAction.stop();
+        
         punchAction.reset();
         punchAction.play();
         
+        // Return to idle after punch finishes
         setTimeout(() => { 
             isPunching = false; 
             if (!isDead && idleAction) {
@@ -274,22 +279,25 @@ function attemptPunch() {
         }, 800); 
     }
 
-    if (player.position.distanceTo(boss.position) < 7) {
-        bossHP--;
-        updateCombatUI();
-        
-        boss.material.color.setHex(0xffffff);
-        setTimeout(() => { if(boss) boss.material.color.setHex(0xaa0000); }, 150);
-        
-        if (bossHP <= 0) {
-            scene.remove(boss);
-            boss = null;
-            meteors.forEach(m => scene.remove(m)); 
-            meteors.length = 0;
-            combatUI.innerHTML = "<span style='color:#00ff88; font-size:30px;'>BOSS DEFEATED! YOU WIN!</span>";
+    // ONLY process damage if fighting the Boss in Level 2
+    if (currentLevel === 2 && boss) {
+        if (player.position.distanceTo(boss.position) < 7) {
+            bossHP--;
+            updateCombatUI();
+            
+            boss.material.color.setHex(0xffffff);
+            setTimeout(() => { if(boss) boss.material.color.setHex(0xaa0000); }, 150);
+            
+            if (bossHP <= 0) {
+                scene.remove(boss);
+                boss = null;
+                meteors.forEach(m => scene.remove(m)); 
+                meteors.length = 0;
+                combatUI.innerHTML = "<span style='color:#00ff88; font-size:30px;'>BOSS DEFEATED! YOU WIN!</span>";
+            }
+        } else {
+            statusEl.innerText = "Too far to punch!";
         }
-    } else {
-        statusEl.innerText = "Too far to punch!";
     }
 }
 
@@ -298,14 +306,23 @@ function triggerDeath() {
     isDead = true;
     statusEl.innerText = "You died! Restarting arena...";
     
-    if (mixer) mixer.stopAllAction();
+    if (mixer) mixer.stopAllAction(); // Stop walking/idling
     
     if (deathAction) {
         deathAction.reset();
         deathAction.play();
-        setTimeout(() => { buildBossLevel(); }, 3000);
+        
+        // Wait 3 seconds to watch the death animation, then respawn
+        setTimeout(() => { 
+            if (currentLevel === 2) buildBossLevel(); 
+            else {
+                // If you test this in Level 1, it just wakes you back up
+                isDead = false; 
+                if (idleAction) { deathAction.stop(); idleAction.play(); }
+            }
+        }, 3000);
     } else {
-        buildBossLevel(); 
+        if (currentLevel === 2) buildBossLevel(); 
     }
 }
 
@@ -315,6 +332,7 @@ const keys = {};
 window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
     if (e.code === 'KeyE') attemptPunch();
+    if (e.code === 'KeyK') triggerDeath(); // SECRET TEST BUTTON!
 }); 
 window.addEventListener('keyup', (e) => keys[e.code] = false);
 
