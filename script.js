@@ -161,7 +161,6 @@ function buildBossLevel() {
     lastMeteorTime = clock.getElapsedTime();
     updateCombatUI();
     
-    // Clear leftover meteors
     meteors.forEach(m => scene.remove(m));
     meteors.length = 0;
 
@@ -170,6 +169,7 @@ function buildBossLevel() {
     
     if (idleAction) {
         if (deathAction) deathAction.stop();
+        if (mixer) mixer.stopAllAction();
         idleAction.reset();
         idleAction.play();
     }
@@ -181,7 +181,7 @@ function updateCombatUI() {
 }
 
 function spawnMeteors() {
-    if (isDead) return; // Don't spawn meteors if player is already dying
+    if (isDead) return; 
     statusEl.innerText = "WARNING: METEORS INCOMING!";
     for (let i = 0; i < 15; i++) {
         const geom = new THREE.SphereGeometry(0.8);
@@ -232,35 +232,21 @@ function loadCharacter(modelPath, spawnPos = currentSpawn) {
             mixer = new THREE.AnimationMixer(currentModel);
             idleAction = null; walkAction = null; punchAction = null; deathAction = null;
             
-            console.log(`\n--- ANIMATIONS INSIDE ${modelPath} ---`);
-            
             gltf.animations.forEach((clip) => {
-                const name = clip.name.toLowerCase();
-                console.log("Found:", clip.name); // Prints the exact name to F12 Console
-                
-                if (name.includes('idle')) idleAction = mixer.clipAction(clip);
-                if (name.includes('walk') || name.includes('run')) walkAction = mixer.clipAction(clip);
-                
-                // Broader search for Punching
-                if (name.includes('punch') || name.includes('attack') || name.includes('hit') || name.includes('strike')) {
-                    punchAction = mixer.clipAction(clip);
-                }
-                
-                // Broader search for Dying
-                if (name.includes('death') || name.includes('defeat') || name.includes('die') || name.includes('down')) {
-                    deathAction = mixer.clipAction(clip);
-                }
+                if (clip.name === 'Idle') idleAction = mixer.clipAction(clip);
+                if (clip.name === 'Walk' || clip.name === 'Run') walkAction = mixer.clipAction(clip);
+                if (clip.name === 'Punch') punchAction = mixer.clipAction(clip);
+                if (clip.name === 'Death') deathAction = mixer.clipAction(clip);
             });
             
             if (!idleAction) idleAction = mixer.clipAction(gltf.animations[0]);
             
-            // Configure One-Shot animations
             if (punchAction) {
                 punchAction.setLoop(THREE.LoopOnce, 1);
             }
             if (deathAction) {
                 deathAction.setLoop(THREE.LoopOnce, 1);
-                deathAction.clampWhenFinished = true; // Stay dead on the final frame
+                deathAction.clampWhenFinished = true; 
             }
             
             idleAction.play();
@@ -273,20 +259,21 @@ document.getElementById('char-select').addEventListener('change', (e) => loadCha
 function attemptPunch() {
     if (currentLevel !== 2 || !boss || isDead || isPunching) return;
     
-    // Play Punch Animation
-    if (punchAction) {
+    if (punchAction && mixer) {
         isPunching = true;
-        if (idleAction) idleAction.stop();
-        if (walkAction) walkAction.stop();
-        
+        mixer.stopAllAction(); 
         punchAction.reset();
         punchAction.play();
         
-        // Wait for the animation to finish before moving again
-        setTimeout(() => { isPunching = false; }, 600); 
+        setTimeout(() => { 
+            isPunching = false; 
+            if (!isDead && idleAction) {
+                punchAction.stop();
+                idleAction.play();
+            }
+        }, 800); 
     }
 
-    // Process damage if close enough
     if (player.position.distanceTo(boss.position) < 7) {
         bossHP--;
         updateCombatUI();
@@ -311,17 +298,13 @@ function triggerDeath() {
     isDead = true;
     statusEl.innerText = "You died! Restarting arena...";
     
-    if (idleAction) idleAction.stop();
-    if (walkAction) walkAction.stop();
-    if (punchAction) punchAction.stop();
+    if (mixer) mixer.stopAllAction();
     
     if (deathAction) {
         deathAction.reset();
         deathAction.play();
-        // Wait 2.5 seconds to show the death animation, then restart
-        setTimeout(() => { buildBossLevel(); }, 2500);
+        setTimeout(() => { buildBossLevel(); }, 3000);
     } else {
-        // Fallback if the model lacks a death animation
         buildBossLevel(); 
     }
 }
@@ -371,7 +354,6 @@ function updatePhysics() {
     if (!currentModel) return;
     let isMoving = false;
 
-    // Halt movement inputs if dead or currently in the middle of a punch
     if (!isDead && !isPunching) {
         if (keys['KeyW'] || keys['ArrowUp']) { player.position.z -= moveSpeed; player.rotation.y = Math.PI; isMoving = true; }
         if (keys['KeyS'] || keys['ArrowDown']) { player.position.z += moveSpeed; player.rotation.y = 0; isMoving = true; }
@@ -420,13 +402,11 @@ function updatePhysics() {
         isGrounded = false; 
     }
 
-    // Falling into the void
     if (player.position.y < -15) {
         if (currentLevel === 2 && !isDead) {
             playerHP--;
             updateCombatUI();
             if (playerHP <= 0) {
-                // Teleport to the safe floor so they don't play the death animation off-screen in the void
                 player.position.set(currentSpawn.x, currentSpawn.y, currentSpawn.z);
                 velocityY = 0;
                 triggerDeath();
@@ -440,7 +420,6 @@ function updatePhysics() {
         }
     }
 
-    // Handle Standard Animations (Walk/Idle) only if not dead and not punching
     if (!isDead && !isPunching) {
         if (isMoving && isGrounded && walkAction && !walkAction.isRunning()) {
             if (idleAction) idleAction.stop(); 
