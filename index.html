@@ -37,14 +37,11 @@
         #status { color: #00ff88; font-size: 13px; margin-top: 10px; word-break: break-all; }
         #user-info { font-size: 12px; color: #aaa; margin-top: 8px; }
         
-        #auth-section {
-            margin-bottom: 15px;
-            border-bottom: 1px solid #444;
-            padding-bottom: 10px;
-        }
+        #auth-section { margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .char-select-container { margin-bottom: 15px; }
+        select { width: 100%; padding: 8px; margin-top: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; }
     </style>
 
-    <!-- Import Map for Three.js and Firebase SDKs -->
     <script type="importmap">
         {
           "imports": {
@@ -60,13 +57,23 @@
 <body>
     <div id="ui">
         <h2 style="margin-top: 0;">3D Game Sandbox</h2>
-        <p style="font-size: 13px; color: #ccc;">Use WASD or Arrow Keys to move</p>
+        <p style="font-size: 13px; color: #ccc;">Use WASD or Arrow Keys</p>
         
-        <!-- Authentication UI -->
         <div id="auth-section">
             <button id="login-btn">Sign in with Google</button>
             <button id="logout-btn">Log Out</button>
             <p id="user-info">Not logged in</p>
+        </div>
+
+        <div class="char-select-container">
+            <label for="char-select" style="font-size: 13px; color: #ccc;">Choose Character:</label>
+            <select id="char-select">
+                <option value="assets/Casual_Male.gltf">Casual Male</option>
+                <option value="assets/Casual_Female.gltf">Casual Female</option>
+                <option value="assets/Pirate_Male.gltf">Pirate Male</option>
+                <option value="assets/Pirate_Female.gltf">Pirate Female</option>
+                <option value="assets/Zombie_Male.gltf">Zombie Male</option>
+            </select>
         </div>
 
         <button id="save-btn" class="action-btn">Save Progress</button>
