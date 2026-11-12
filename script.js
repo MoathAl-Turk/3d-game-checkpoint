@@ -12,11 +12,23 @@ const firebaseConfig = {
   messagingSenderId: "68575491787",
   appId: "1:68575491787:web:1811cbf860460b55ddcd4e"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 let currentUserId = null;
+
+// --- STARTUP / CONTROL SELECTION LOGIC ---
+document.getElementById('choose-pc').addEventListener('click', () => {
+    document.getElementById('startup-prompt').style.display = 'none';
+    document.getElementById('mobile-controls').style.display = 'none';
+});
+
+document.getElementById('choose-mobile').addEventListener('click', () => {
+    document.getElementById('startup-prompt').style.display = 'none';
+    document.getElementById('mobile-controls').style.display = 'block';
+});
 
 // --- COMBAT UI ---
 const combatUI = document.createElement('div');
@@ -233,26 +245,30 @@ document.getElementById('char-select').addEventListener('change', (e) => loadCha
 // --- CONTROLS & INPUT LOOP ---
 const keys = {};
 
-// PC Keyboard
+// PC Keyboard Events
 window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
     if (e.code === 'KeyE') attemptPunch();
 }); 
 window.addEventListener('keyup', (e) => keys[e.code] = false);
 
-// Mobile Touch Controls
+// Mobile Touch Events (Maps touch directly to the WASD/Space/E engine)
 function bindTouch(btnId, keyId) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
+    
+    // Prevent default to stop scrolling/zooming while tapping
     btn.addEventListener('touchstart', (e) => {
-        e.preventDefault(); // Stop default scroll/zoom
+        e.preventDefault(); 
         keys[keyId] = true;
-        if (keyId === 'KeyE') attemptPunch(); // Trigger punch on tap
+        if (keyId === 'KeyE') attemptPunch();
     }, {passive: false});
+    
     btn.addEventListener('touchend', (e) => {
         e.preventDefault();
         keys[keyId] = false;
     }, {passive: false});
+    
     btn.addEventListener('touchcancel', (e) => {
         e.preventDefault();
         keys[keyId] = false;
