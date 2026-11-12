@@ -19,17 +19,6 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 let currentUserId = null;
 
-// --- STARTUP / CONTROL SELECTION LOGIC ---
-document.getElementById('choose-pc').addEventListener('click', () => {
-    document.getElementById('startup-prompt').style.display = 'none';
-    document.getElementById('mobile-controls').style.display = 'none';
-});
-
-document.getElementById('choose-mobile').addEventListener('click', () => {
-    document.getElementById('startup-prompt').style.display = 'none';
-    document.getElementById('mobile-controls').style.display = 'block';
-});
-
 // --- COMBAT UI ---
 const combatUI = document.createElement('div');
 combatUI.style.cssText = "position:absolute; top:20px; left:50%; transform:translateX(-50%); color:#ff4444; font-size:24px; font-weight:bold; text-shadow: 2px 2px 0 #000; display:none; text-align:center; z-index:5; pointer-events:none; width: 90%;";
@@ -54,6 +43,22 @@ onAuthStateChanged(auth, (user) => {
 });
 document.getElementById('login-btn').addEventListener('click', () => signInWithPopup(auth, provider));
 document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+
+// --- STARTUP / CONTROL SELECTION LOGIC ---
+const startupPrompt = document.getElementById('startup-prompt');
+const mobileControls = document.getElementById('mobile-controls');
+if (document.getElementById('choose-pc')) {
+    document.getElementById('choose-pc').addEventListener('click', () => {
+        startupPrompt.style.display = 'none';
+        mobileControls.style.display = 'none';
+    });
+}
+if (document.getElementById('choose-mobile')) {
+    document.getElementById('choose-mobile').addEventListener('click', () => {
+        startupPrompt.style.display = 'none';
+        mobileControls.style.display = 'block';
+    });
+}
 
 // --- 3D SCENE SETUP ---
 const scene = new THREE.Scene();
@@ -128,6 +133,8 @@ let lastMeteorTime = 0;
 function buildBossLevel() {
     currentLevel = 2;
     statusEl.innerText = "Entered the Red Moon Arena!";
+    isDead = false;
+    isPunching = false;
     
     platforms.forEach(p => scene.remove(p.mesh));
     platforms.length = 0;
@@ -153,9 +160,19 @@ function buildBossLevel() {
     playerHP = 3;
     lastMeteorTime = clock.getElapsedTime();
     updateCombatUI();
+    
+    // Clear leftover meteors
+    meteors.forEach(m => scene.remove(m));
+    meteors.length = 0;
 
     player.position.set(0, 1, 0);
     currentSpawn = { x: 0, y: 1, z: 0 };
+    
+    if (idleAction) {
+        if (deathAction) deathAction.stop();
+        idleAction.reset();
+        idleAction.play();
+    }
 }
 
 function updateCombatUI() {
@@ -164,6 +181,7 @@ function updateCombatUI() {
 }
 
 function spawnMeteors() {
+    if (isDead) return; // Don't spawn meteors if player is already dying
     statusEl.innerText = "WARNING: METEORS INCOMING!";
     for (let i = 0; i < 15; i++) {
         const geom = new THREE.SphereGeometry(0.8);
@@ -180,41 +198,23 @@ function spawnMeteors() {
     }
 }
 
-function attemptPunch() {
-    if (currentLevel === 2 && boss) {
-        if (player.position.distanceTo(boss.position) < 7) {
-            bossHP--;
-            updateCombatUI();
-            
-            boss.material.color.setHex(0xffffff);
-            setTimeout(() => { if(boss) boss.material.color.setHex(0xaa0000); }, 150);
-            
-            if (bossHP <= 0) {
-                scene.remove(boss);
-                boss = null;
-                meteors.forEach(m => scene.remove(m)); 
-                meteors.length = 0;
-                combatUI.innerHTML = "<span style='color:#00ff88; font-size:30px;'>BOSS DEFEATED! YOU WIN!</span>";
-            }
-        } else {
-            statusEl.innerText = "Too far to punch!";
-        }
-    }
-}
-
-// --- PLAYER PHYSICS VARIABLES ---
+// --- PLAYER STATE VARIABLES ---
 let player = new THREE.Group(); 
 scene.add(player);
 let currentSpawn = { x: 0, y: 0, z: 0 }; 
 let currentPlatformId = -1; 
 let velocityY = 0;
 let isGrounded = false;
+let isPunching = false;
+let isDead = false;
+
 const gravity = -0.015; 
 const jumpForce = 0.35;
 const moveSpeed = 0.12;
 
-// --- LOAD CHARACTER ---
-let currentModel = null, mixer = null, idleAction = null, walkAction = null;
+// --- LOAD CHARACTER & ANIMATIONS ---
+let currentModel = null, mixer = null;
+let idleAction = null, walkAction = null, punchAction = null, deathAction = null;
 const clock = new THREE.Clock(); 
 const loader = new GLTFLoader();
 let currentModelPath = "Casual_Male.gltf";
@@ -227,39 +227,108 @@ function loadCharacter(modelPath, spawnPos = currentSpawn) {
         player.add(currentModel);
         player.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
         velocityY = 0;
+        
         if (gltf.animations.length > 0) {
             mixer = new THREE.AnimationMixer(currentModel);
-            idleAction = null; walkAction = null;
+            idleAction = null; walkAction = null; punchAction = null; deathAction = null;
+            
             gltf.animations.forEach((clip) => {
                 const name = clip.name.toLowerCase();
                 if (name.includes('idle')) idleAction = mixer.clipAction(clip);
                 if (name.includes('walk') || name.includes('run')) walkAction = mixer.clipAction(clip);
+                if (name.includes('punch') || name.includes('attack')) punchAction = mixer.clipAction(clip);
+                if (name.includes('death') || name.includes('defeat')) deathAction = mixer.clipAction(clip);
             });
+            
             if (!idleAction) idleAction = mixer.clipAction(gltf.animations[0]);
-            if (idleAction) idleAction.play();
+            
+            // Configure One-Shot animations
+            if (punchAction) {
+                punchAction.setLoop(THREE.LoopOnce, 1);
+            }
+            if (deathAction) {
+                deathAction.setLoop(THREE.LoopOnce, 1);
+                deathAction.clampWhenFinished = true; // Stay dead on the final frame
+            }
+            
+            idleAction.play();
         }
     });
 }
 document.getElementById('char-select').addEventListener('change', (e) => loadCharacter(e.target.value, player.position));
 
+// --- ACTION TRIGGERS ---
+function attemptPunch() {
+    if (currentLevel !== 2 || !boss || isDead || isPunching) return;
+    
+    // Play Punch Animation
+    if (punchAction) {
+        isPunching = true;
+        if (idleAction) idleAction.stop();
+        if (walkAction) walkAction.stop();
+        
+        punchAction.reset();
+        punchAction.play();
+        
+        // Wait for the animation to finish before moving again
+        setTimeout(() => { isPunching = false; }, 600); 
+    }
+
+    // Process damage if close enough
+    if (player.position.distanceTo(boss.position) < 7) {
+        bossHP--;
+        updateCombatUI();
+        
+        boss.material.color.setHex(0xffffff);
+        setTimeout(() => { if(boss) boss.material.color.setHex(0xaa0000); }, 150);
+        
+        if (bossHP <= 0) {
+            scene.remove(boss);
+            boss = null;
+            meteors.forEach(m => scene.remove(m)); 
+            meteors.length = 0;
+            combatUI.innerHTML = "<span style='color:#00ff88; font-size:30px;'>BOSS DEFEATED! YOU WIN!</span>";
+        }
+    } else {
+        statusEl.innerText = "Too far to punch!";
+    }
+}
+
+function triggerDeath() {
+    if (isDead) return;
+    isDead = true;
+    statusEl.innerText = "You died! Restarting arena...";
+    
+    if (idleAction) idleAction.stop();
+    if (walkAction) walkAction.stop();
+    if (punchAction) punchAction.stop();
+    
+    if (deathAction) {
+        deathAction.reset();
+        deathAction.play();
+        // Wait 2.5 seconds to show the death animation, then restart
+        setTimeout(() => { buildBossLevel(); }, 2500);
+    } else {
+        // Fallback if the model lacks a death animation
+        buildBossLevel(); 
+    }
+}
+
 // --- CONTROLS & INPUT LOOP ---
 const keys = {};
 
-// PC Keyboard Events
 window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
     if (e.code === 'KeyE') attemptPunch();
 }); 
 window.addEventListener('keyup', (e) => keys[e.code] = false);
 
-// Mobile Touch Events (Maps touch directly to the WASD/Space/E engine)
-// Mobile Touch & Mouse Events (Maps directly to the WASD/Space/E engine)
 function bindTouch(btnId, keyId) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
     
     const press = (e) => {
-        e.preventDefault(); // Stop default scroll/zoom
+        e.preventDefault(); 
         keys[keyId] = true;
         if (keyId === 'KeyE') attemptPunch();
     };
@@ -269,15 +338,13 @@ function bindTouch(btnId, keyId) {
         keys[keyId] = false;
     };
 
-    // Touch support for real phones
     btn.addEventListener('touchstart', press, {passive: false});
     btn.addEventListener('touchend', release, {passive: false});
     btn.addEventListener('touchcancel', release, {passive: false});
     
-    // Mouse support for testing on PC
     btn.addEventListener('mousedown', press);
     btn.addEventListener('mouseup', release);
-    btn.addEventListener('mouseleave', release); // Stops holding the button if you drag mouse off it
+    btn.addEventListener('mouseleave', release);
 }
 
 bindTouch('btn-up', 'KeyW');
@@ -292,10 +359,13 @@ function updatePhysics() {
     if (!currentModel) return;
     let isMoving = false;
 
-    if (keys['KeyW'] || keys['ArrowUp']) { player.position.z -= moveSpeed; player.rotation.y = Math.PI; isMoving = true; }
-    if (keys['KeyS'] || keys['ArrowDown']) { player.position.z += moveSpeed; player.rotation.y = 0; isMoving = true; }
-    if (keys['KeyA'] || keys['ArrowLeft']) { player.position.x -= moveSpeed; player.rotation.y = -Math.PI / 2; isMoving = true; }
-    if (keys['KeyD'] || keys['ArrowRight']) { player.position.x += moveSpeed; player.rotation.y = Math.PI / 2; isMoving = true; }
+    // Halt movement inputs if dead or currently in the middle of a punch
+    if (!isDead && !isPunching) {
+        if (keys['KeyW'] || keys['ArrowUp']) { player.position.z -= moveSpeed; player.rotation.y = Math.PI; isMoving = true; }
+        if (keys['KeyS'] || keys['ArrowDown']) { player.position.z += moveSpeed; player.rotation.y = 0; isMoving = true; }
+        if (keys['KeyA'] || keys['ArrowLeft']) { player.position.x -= moveSpeed; player.rotation.y = -Math.PI / 2; isMoving = true; }
+        if (keys['KeyD'] || keys['ArrowRight']) { player.position.x += moveSpeed; player.rotation.y = Math.PI / 2; isMoving = true; }
+    }
 
     let floorY = -Infinity;
     let landedPlatform = null;
@@ -333,26 +403,47 @@ function updatePhysics() {
         isGrounded = false;
     }
 
-    if (keys['Space'] && isGrounded) { velocityY = jumpForce; isGrounded = false; }
-
-    if (player.position.y < -15) {
-        player.position.set(currentSpawn.x, currentSpawn.y, currentSpawn.z);
-        velocityY = 0;
-        if (currentLevel === 2) playerHP--; 
-        updateCombatUI();
+    if (!isDead && !isPunching && keys['Space'] && isGrounded) { 
+        velocityY = jumpForce; 
+        isGrounded = false; 
     }
 
-    if (isMoving && isGrounded && walkAction && !walkAction.isRunning()) {
-        if (idleAction) idleAction.stop(); walkAction.play();
-    } else if ((!isMoving || !isGrounded) && idleAction && !idleAction.isRunning()) {
-        if (walkAction) walkAction.stop(); idleAction.play();
+    // Falling into the void
+    if (player.position.y < -15) {
+        if (currentLevel === 2 && !isDead) {
+            playerHP--;
+            updateCombatUI();
+            if (playerHP <= 0) {
+                // Teleport to the safe floor so they don't play the death animation off-screen in the void
+                player.position.set(currentSpawn.x, currentSpawn.y, currentSpawn.z);
+                velocityY = 0;
+                triggerDeath();
+            } else {
+                player.position.set(currentSpawn.x, currentSpawn.y, currentSpawn.z);
+                velocityY = 0;
+            }
+        } else if (currentLevel === 1) {
+            player.position.set(currentSpawn.x, currentSpawn.y, currentSpawn.z);
+            velocityY = 0;
+        }
+    }
+
+    // Handle Standard Animations (Walk/Idle) only if not dead and not punching
+    if (!isDead && !isPunching) {
+        if (isMoving && isGrounded && walkAction && !walkAction.isRunning()) {
+            if (idleAction) idleAction.stop(); 
+            walkAction.play();
+        } else if ((!isMoving || !isGrounded) && idleAction && !idleAction.isRunning()) {
+            if (walkAction) walkAction.stop(); 
+            idleAction.play();
+        }
     }
 }
 
 function updateCombatLogic(time) {
     if (currentLevel !== 2) return;
     
-    if (boss && time - lastMeteorTime > 10) {
+    if (boss && !isDead && time - lastMeteorTime > 10) {
         lastMeteorTime = time;
         spawnMeteors();
     }
@@ -367,21 +458,20 @@ function updateCombatLogic(time) {
             continue;
         }
         
-        if (m.position.distanceTo(player.position) < 2.0) {
+        if (!isDead && m.position.distanceTo(player.position) < 2.0) {
             scene.remove(m);
             meteors.splice(i, 1);
             playerHP--;
             updateCombatUI();
             
-            player.position.y += 2;
-            velocityY = 0;
-            statusEl.innerText = "OUCH! Hit by a meteor!";
+            if (playerHP <= 0) {
+                triggerDeath();
+            } else {
+                player.position.y += 2;
+                velocityY = 0;
+                statusEl.innerText = "OUCH! Hit by a meteor!";
+            }
         }
-    }
-    
-    if (playerHP <= 0 && boss) {
-        statusEl.innerText = "You died! Restarting arena...";
-        buildBossLevel(); 
     }
     
     if (boss) {
