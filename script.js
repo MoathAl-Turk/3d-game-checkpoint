@@ -5,14 +5,13 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signO
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCe3tkeCGCaxg6P5YAWtyuPFTGt02a6QZQ",
-  authDomain: "d-game-checkpoints.firebaseapp.com",
-  projectId: "d-game-checkpoints",
-  storageBucket: "d-game-checkpoints.firebasestorage.app",
-  messagingSenderId: "68575491787",
-  appId: "1:68575491787:web:1811cbf860460b55ddcd4e"
+  apiKey: "AIzaSyCe3tkeCGCaxg6P5YAWtyuPFTGt02a6QZQ",
+  authDomain: "d-game-checkpoints.firebaseapp.com",
+  projectId: "d-game-checkpoints",
+  storageBucket: "d-game-checkpoints.firebasestorage.app",
+  messagingSenderId: "68575491787",
+  appId: "1:68575491787:web:1811cbf860460b55ddcd4e"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -21,7 +20,7 @@ let currentUserId = null;
 
 // --- COMBAT UI ---
 const combatUI = document.createElement('div');
-combatUI.style.cssText = "position:absolute; top:20px; left:50%; transform:translateX(-50%); color:#ff4444; font-size:24px; font-weight:bold; text-shadow: 2px 2px 0 #000; display:none; text-align:center; z-index:5; pointer-events:none;";
+combatUI.style.cssText = "position:absolute; top:20px; left:50%; transform:translateX(-50%); color:#ff4444; font-size:24px; font-weight:bold; text-shadow: 2px 2px 0 #000; display:none; text-align:center; z-index:5; pointer-events:none; width: 90%;";
 document.body.appendChild(combatUI);
 
 // --- UI SLIDE MENU LOGIC ---
@@ -57,7 +56,6 @@ const dirLight = new THREE.DirectionalLight(0xffdcb4, 1.5);
 dirLight.position.set(20, 20, -50);
 scene.add(dirLight);
 
-// The Sun/Moon Sphere
 const sunGeom = new THREE.SphereGeometry(15, 32, 32);
 const sunMat = new THREE.MeshBasicMaterial({ color: 0xff3300 }); 
 const sun = new THREE.Mesh(sunGeom, sunMat);
@@ -88,8 +86,6 @@ function createPlatform(x, y, z, width, depth, color = 0x22aa55, isGoal = false)
 function buildParkourLevel() {
     currentLevel = 1;
     combatUI.style.display = "none";
-    
-    // Normal Sunset Theme
     scene.background = new THREE.Color(0xff8c00); 
     scene.fog = new THREE.FogExp2(0xff8c00, 0.015);
     sun.material.color.setHex(0xff3300);
@@ -107,7 +103,7 @@ function buildParkourLevel() {
     createPlatform(0, 2, -28, 4, 4, 0xaa2255);           
     createPlatform(0, 3, -40, 8, 8, 0xffaa00);           
     createPlatform(-8, 4, -48, 4, 4, 0x2255aa);          
-    createPlatform(0, 4, -60, 8, 8, 0xffff00, true);     // THE GOAL PLATFORM
+    createPlatform(0, 4, -60, 8, 8, 0xffff00, true); 
 }
 
 // --- BOSS COMBAT VARIABLES ---
@@ -124,21 +120,16 @@ function buildBossLevel() {
     platforms.forEach(p => scene.remove(p.mesh));
     platforms.length = 0;
     
-    // --- RED MOON THEME ---
-    scene.background = new THREE.Color(0x1a0505); // Deep blackish-red sky
+    scene.background = new THREE.Color(0x1a0505); 
     scene.fog = new THREE.FogExp2(0x1a0505, 0.015);
-    
-    sun.material.color.setHex(0xff0000); // Blood red moon
-    sun.scale.set(2.5, 2.5, 2.5); // Make it massive
+    sun.material.color.setHex(0xff0000); 
+    sun.scale.set(2.5, 2.5, 2.5); 
     sun.position.set(0, 40, -150);
-    
-    ambientLight.color.setHex(0x440000); // Dim red ambient light
-    dirLight.color.setHex(0xff4444); // Harsh red shadows
+    ambientLight.color.setHex(0x440000); 
+    dirLight.color.setHex(0xff4444); 
 
-    // Dark Ash Floor
     createPlatform(0, -1, 0, 300, 300, 0x221111);
 
-    // Spawn Boss Cube
     if (boss) scene.remove(boss);
     const bossGeom = new THREE.BoxGeometry(5, 5, 5);
     const bossMat = new THREE.MeshStandardMaterial({ color: 0xaa0000, emissive: 0x330000 });
@@ -157,14 +148,14 @@ function buildBossLevel() {
 
 function updateCombatUI() {
     combatUI.style.display = "block";
-    combatUI.innerHTML = `Player HP: ${'❤️'.repeat(playerHP)} <br><br> Boss Cube: ${bossHP} / 5<br><span style="font-size:14px; color:#ccc;">Press E to Punch!</span>`;
+    combatUI.innerHTML = `HP: ${'❤️'.repeat(playerHP)} <br> Boss Cube: ${bossHP} / 5<br><span style="font-size:14px; color:#ccc;">Press E (or Punch) to Attack!</span>`;
 }
 
 function spawnMeteors() {
     statusEl.innerText = "WARNING: METEORS INCOMING!";
     for (let i = 0; i < 15; i++) {
         const geom = new THREE.SphereGeometry(0.8);
-        const mat = new THREE.MeshBasicMaterial({ color: 0xff1100 }); // Red hot meteors
+        const mat = new THREE.MeshBasicMaterial({ color: 0xff1100 }); 
         const meteor = new THREE.Mesh(geom, mat);
         
         meteor.position.set(
@@ -174,6 +165,28 @@ function spawnMeteors() {
         );
         scene.add(meteor);
         meteors.push(meteor);
+    }
+}
+
+function attemptPunch() {
+    if (currentLevel === 2 && boss) {
+        if (player.position.distanceTo(boss.position) < 7) {
+            bossHP--;
+            updateCombatUI();
+            
+            boss.material.color.setHex(0xffffff);
+            setTimeout(() => { if(boss) boss.material.color.setHex(0xaa0000); }, 150);
+            
+            if (bossHP <= 0) {
+                scene.remove(boss);
+                boss = null;
+                meteors.forEach(m => scene.remove(m)); 
+                meteors.length = 0;
+                combatUI.innerHTML = "<span style='color:#00ff88; font-size:30px;'>BOSS DEFEATED! YOU WIN!</span>";
+            }
+        } else {
+            statusEl.innerText = "Too far to punch!";
+        }
     }
 }
 
@@ -217,36 +230,43 @@ function loadCharacter(modelPath, spawnPos = currentSpawn) {
 }
 document.getElementById('char-select').addEventListener('change', (e) => loadCharacter(e.target.value, player.position));
 
-// --- CONTROLS & PHYSICS LOOP ---
+// --- CONTROLS & INPUT LOOP ---
 const keys = {};
+
+// PC Keyboard
 window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
-    
-    // PUNCH MECHANIC (Press E)
-    if (e.code === 'KeyE' && currentLevel === 2 && boss) {
-        // Check if player is close enough to punch
-        if (player.position.distanceTo(boss.position) < 7) {
-            bossHP--;
-            updateCombatUI();
-            
-            // Flash white to show damage taken
-            boss.material.color.setHex(0xffffff);
-            setTimeout(() => { if(boss) boss.material.color.setHex(0xaa0000); }, 150);
-            
-            if (bossHP <= 0) {
-                scene.remove(boss);
-                boss = null;
-                meteors.forEach(m => scene.remove(m)); 
-                meteors.length = 0;
-                combatUI.innerHTML = "<span style='color:#00ff88; font-size:30px;'>BOSS DEFEATED! YOU WIN!</span>";
-            }
-        } else {
-            statusEl.innerText = "Too far to punch!";
-        }
-    }
+    if (e.code === 'KeyE') attemptPunch();
 }); 
 window.addEventListener('keyup', (e) => keys[e.code] = false);
 
+// Mobile Touch Controls
+function bindTouch(btnId, keyId) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.addEventListener('touchstart', (e) => {
+        e.preventDefault(); // Stop default scroll/zoom
+        keys[keyId] = true;
+        if (keyId === 'KeyE') attemptPunch(); // Trigger punch on tap
+    }, {passive: false});
+    btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        keys[keyId] = false;
+    }, {passive: false});
+    btn.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        keys[keyId] = false;
+    }, {passive: false});
+}
+
+bindTouch('btn-up', 'KeyW');
+bindTouch('btn-down', 'KeyS');
+bindTouch('btn-left', 'KeyA');
+bindTouch('btn-right', 'KeyD');
+bindTouch('btn-jump', 'Space');
+bindTouch('btn-punch', 'KeyE');
+
+// --- PHYSICS ENGINE ---
 function updatePhysics() {
     if (!currentModel) return;
     let isMoving = false;
