@@ -12,6 +12,7 @@ const firebaseConfig = {
   messagingSenderId: "68575491787",
   appId: "1:68575491787:web:1811cbf860460b55ddcd4e"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -23,7 +24,6 @@ document.getElementById('settings-toggle').addEventListener('click', () => {
     document.getElementById('ui-container').classList.toggle('open');
 });
 
-// --- AUTHENTICATION LOGIC ---
 const statusEl = document.getElementById('status');
 onAuthStateChanged(auth, (user) => {
     if (user) {
@@ -41,24 +41,33 @@ onAuthStateChanged(auth, (user) => {
 document.getElementById('login-btn').addEventListener('click', () => signInWithPopup(auth, provider));
 document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
 
-// --- 3D SCENE SETUP ---
+// --- 3D SCENE & SUNSET SETUP ---
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB); // Sky blue
-scene.fog = new THREE.Fog(0x87CEEB, 20, 100); // Adds atmospheric distance fading
+scene.background = new THREE.Color(0xff8c00); // Sunset Orange
+scene.fog = new THREE.FogExp2(0xff8c00, 0.015); // Hides the edge of the world with orange fog
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+// Lighting adapted for sunset
+const ambientLight = new THREE.AmbientLight(0xffaa55, 0.8);
 scene.add(ambientLight);
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-dirLight.position.set(10, 20, 10);
+const dirLight = new THREE.DirectionalLight(0xffdcb4, 1.5);
+dirLight.position.set(20, 20, -50);
 scene.add(dirLight);
+
+// The Sun Sphere
+const sunGeom = new THREE.SphereGeometry(15, 32, 32);
+const sunMat = new THREE.MeshBasicMaterial({ color: 0xff3300 }); // Glowing red-orange
+const sun = new THREE.Mesh(sunGeom, sunMat);
+sun.position.set(0, 15, -100);
+scene.add(sun);
 
 // --- PARKOUR LEVEL BUILDER ---
 const platforms = [];
+let platformCounter = 0;
 
 function createPlatform(x, y, z, width, depth, color = 0x22aa55) {
     const geom = new THREE.BoxGeometry(width, 1, depth);
@@ -67,15 +76,21 @@ function createPlatform(x, y, z, width, depth, color = 0x22aa55) {
     mesh.position.set(x, y, z);
     scene.add(mesh);
     
-    // Store the exact bounding box for collision detection
     mesh.updateMatrixWorld();
     const box = new THREE.Box3().setFromObject(mesh);
-    platforms.push(box);
+    
+    // Store extra data for auto-checkpoints
+    platforms.push({
+        id: platformCounter++,
+        bounds: box,
+        centerX: x,
+        topY: box.max.y,
+        centerZ: z
+    });
 }
 
-// Build the map!
-createPlatform(0, -1, 0, 10, 10);              // Start platform
-createPlatform(0, 0, -12, 6, 6, 0xaa5522);     // Jump 1 (higher)
+createPlatform(0, -1, 0, 10, 10, 0x555555);              // Start platform
+createPlatform(0, 0, -12, 6, 6, 0xaa5522);     // Jump 1
 createPlatform(6, 1, -20, 4, 4, 0x5522aa);     // Jump 2 (right)
 createPlatform(0, 2, -28, 4, 4, 0xaa2255);     // Jump 3 (left)
 createPlatform(0, 3, -40, 8, 8, 0xffaa00);     // Checkpoint platform!
@@ -84,10 +99,11 @@ createPlatform(0, 3, -40, 8, 8, 0xffaa00);     // Checkpoint platform!
 let player = new THREE.Group(); 
 scene.add(player);
 
-let currentSpawn = { x: 0, y: 0, z: 0 }; // Where they respawn if they fall
+let currentSpawn = { x: 0, y: 0, z: 0 }; 
+let currentPlatformId = -1; // Tracks which block you are on
 let velocityY = 0;
 let isGrounded = false;
-const gravity = -0.018;
+const gravity = -0.015; // Slightly floaty gravity for easier parkour
 const jumpForce = 0.35;
 const moveSpeed = 0.12;
 
@@ -105,12 +121,11 @@ function loadCharacter(modelPath, spawnPos = currentSpawn) {
         currentModel = gltf.scene;
         player.add(currentModel);
         player.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
-        velocityY = 0; // Reset falling speed when loading
+        velocityY = 0;
 
         if (gltf.animations.length > 0) {
             mixer = new THREE.AnimationMixer(currentModel);
             idleAction = null; walkAction = null;
-            
             gltf.animations.forEach((clip) => {
                 const name = clip.name.toLowerCase();
                 if (name.includes('idle')) idleAction = mixer.clipAction(clip);
@@ -126,58 +141,70 @@ document.getElementById('char-select').addEventListener('change', (e) => loadCha
 
 // --- CONTROLS & PHYSICS LOOP ---
 const keys = {};
-window.addEventListener('keydown', (e) => keys[e.code] = true); // Using e.code for better Spacebar support
+window.addEventListener('keydown', (e) => keys[e.code] = true); 
 window.addEventListener('keyup', (e) => keys[e.code] = false);
 
 function updatePhysics() {
     if (!currentModel) return;
     let isMoving = false;
 
-    // 1. Horizontal Movement
+    // Movement
     if (keys['KeyW'] || keys['ArrowUp']) { player.position.z -= moveSpeed; player.rotation.y = Math.PI; isMoving = true; }
     if (keys['KeyS'] || keys['ArrowDown']) { player.position.z += moveSpeed; player.rotation.y = 0; isMoving = true; }
     if (keys['KeyA'] || keys['ArrowLeft']) { player.position.x -= moveSpeed; player.rotation.y = -Math.PI / 2; isMoving = true; }
     if (keys['KeyD'] || keys['ArrowRight']) { player.position.x += moveSpeed; player.rotation.y = Math.PI / 2; isMoving = true; }
 
-    // 2. Determine floor height directly under player
+    // Improved Collision Detection (Padded Hitbox)
     let floorY = -Infinity;
-    for (const box of platforms) {
-        // Simple bounding box check (X and Z)
-        if (player.position.x > box.min.x && player.position.x < box.max.x &&
-            player.position.z > box.min.z && player.position.z < box.max.z) {
-            // If the platform is below the player's feet (allowing for current fall speed)
-            if (box.max.y > floorY && player.position.y >= box.max.y - Math.abs(velocityY) - 0.2) {
-                floorY = box.max.y;
+    let landedPlatform = null;
+    const pX = player.position.x;
+    const pZ = player.position.z;
+    const hitboxPadding = 0.6; // Expands the platform catch area so you don't slip off the very edge
+
+    for (const plat of platforms) {
+        if (pX + hitboxPadding > plat.bounds.min.x && pX - hitboxPadding < plat.bounds.max.x &&
+            pZ + hitboxPadding > plat.bounds.min.z && pZ - hitboxPadding < plat.bounds.max.z) {
+            
+            if (plat.topY > floorY && player.position.y >= plat.topY - Math.abs(velocityY) - 0.2) {
+                floorY = plat.topY;
+                landedPlatform = plat;
             }
         }
     }
 
-    // 3. Apply Gravity
+    // Apply Gravity
     velocityY += gravity;
     player.position.y += velocityY;
 
-    // 4. Ground Collision & Jumping
+    // Ground Collision & Auto Checkpoints
     if (player.position.y <= floorY) {
         player.position.y = floorY;
         velocityY = 0;
         isGrounded = true;
+        
+        // Auto-save local checkpoint to the center of the block you just landed on
+        if (landedPlatform && currentPlatformId !== landedPlatform.id) {
+            currentPlatformId = landedPlatform.id;
+            currentSpawn = { x: landedPlatform.centerX, y: landedPlatform.topY, z: landedPlatform.centerZ };
+        }
     } else {
         isGrounded = false;
     }
 
+    // Jumping
     if (keys['Space'] && isGrounded) {
         velocityY = jumpForce;
         isGrounded = false;
     }
 
-    // 5. Void Death / Respawn Checkpoint
+    // Void Death / Respawn at local checkpoint
     if (player.position.y < -15) {
         player.position.set(currentSpawn.x, currentSpawn.y, currentSpawn.z);
         velocityY = 0;
-        statusEl.innerText = "Respawned at checkpoint!";
+        statusEl.innerText = "Respawned at block!";
     }
 
-    // 6. Handle Animations
+    // Handle Animations
     if (isMoving && isGrounded && walkAction && !walkAction.isRunning()) {
         if (idleAction) idleAction.stop();
         walkAction.play();
@@ -193,9 +220,12 @@ function animate() {
     const delta = clock.getDelta();
     if (mixer) mixer.update(delta);
     
+    // Slowly rotate the sun in the background
+    sun.position.x = Math.sin(Date.now() * 0.0005) * 50;
+
     updatePhysics();
 
-    // Camera smoothly follows player
+    // Camera follows player
     camera.position.x = player.position.x;
     camera.position.z = player.position.z + 12; 
     camera.position.y = player.position.y + 6;
@@ -211,34 +241,32 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// --- FIREBASE SAVE & LOAD (CHECKPOINTS) ---
+// --- FIREBASE SAVE & LOAD (CLOUD CHECKPOINTS) ---
 document.getElementById('save-btn').addEventListener('click', async () => {
     if (!currentUserId || !currentModel) return;
-    statusEl.innerText = "Saving checkpoint...";
+    statusEl.innerText = "Saving to cloud...";
     try {
         const saveRef = doc(db, "game_saves", currentUserId);
         await setDoc(saveRef, {
             x: player.position.x, y: player.position.y, z: player.position.z,
             model: currentModelPath, lastUpdated: new Date().toISOString()
         }, { merge: true });
-        
-        // Update the respawn point to this save!
-        currentSpawn = { x: player.position.x, y: player.position.y, z: player.position.z };
-        statusEl.innerText = `Checkpoint saved!`;
+        statusEl.innerText = `Cloud Checkpoint saved!`;
     } catch (error) { statusEl.innerText = "Save failed."; }
 });
 
 document.getElementById('load-btn').addEventListener('click', async () => {
     if (!currentUserId) return;
-    statusEl.innerText = "Loading checkpoint...";
+    statusEl.innerText = "Loading cloud checkpoint...";
     try {
         const saveRef = doc(db, "game_saves", currentUserId);
         const docSnap = await getDoc(saveRef);
         if (docSnap.exists()) {
             const data = docSnap.data();
-            currentSpawn = { x: data.x, y: data.y, z: data.z }; // Update respawn point
+            currentSpawn = { x: data.x, y: data.y, z: data.z }; 
+            currentPlatformId = -1; // Reset block tracker
             loadCharacter(data.model || "Casual_Male.gltf", currentSpawn);
-            statusEl.innerText = "Loaded saved checkpoint!";
+            statusEl.innerText = "Loaded cloud checkpoint!";
         } else {
             statusEl.innerText = "No save found.";
         }
