@@ -253,26 +253,31 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => keys[e.code] = false);
 
 // Mobile Touch Events (Maps touch directly to the WASD/Space/E engine)
+// Mobile Touch & Mouse Events (Maps directly to the WASD/Space/E engine)
 function bindTouch(btnId, keyId) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
     
-    // Prevent default to stop scrolling/zooming while tapping
-    btn.addEventListener('touchstart', (e) => {
-        e.preventDefault(); 
+    const press = (e) => {
+        e.preventDefault(); // Stop default scroll/zoom
         keys[keyId] = true;
         if (keyId === 'KeyE') attemptPunch();
-    }, {passive: false});
+    };
     
-    btn.addEventListener('touchend', (e) => {
+    const release = (e) => {
         e.preventDefault();
         keys[keyId] = false;
-    }, {passive: false});
+    };
+
+    // Touch support for real phones
+    btn.addEventListener('touchstart', press, {passive: false});
+    btn.addEventListener('touchend', release, {passive: false});
+    btn.addEventListener('touchcancel', release, {passive: false});
     
-    btn.addEventListener('touchcancel', (e) => {
-        e.preventDefault();
-        keys[keyId] = false;
-    }, {passive: false});
+    // Mouse support for testing on PC
+    btn.addEventListener('mousedown', press);
+    btn.addEventListener('mouseup', release);
+    btn.addEventListener('mouseleave', release); // Stops holding the button if you drag mouse off it
 }
 
 bindTouch('btn-up', 'KeyW');
