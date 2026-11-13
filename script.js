@@ -4,13 +4,14 @@ import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "firebase/auth";
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+// TODO: Paste your actual Firebase config here
 const firebaseConfig = {
-  apiKey: "AIzaSyCe3tkeCGCaxg6P5YAWtyuPFTGt02a6QZQ",
-  authDomain: "d-game-checkpoints.firebaseapp.com",
-  projectId: "d-game-checkpoints",
-  storageBucket: "d-game-checkpoints.firebasestorage.app",
-  messagingSenderId: "68575491787",
-  appId: "1:68575491787:web:1811cbf860460b55ddcd4e"
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -348,7 +349,12 @@ function attemptPunch() {
     }
 
     if (currentLevel === 2 && boss) {
-        if (player.position.distanceTo(boss.position) < 7) {
+        // Flat 2D check for punching (can reach up to 7 units away)
+        const dx = player.position.x - boss.position.x;
+        const dz = player.position.z - boss.position.z;
+        const dist2D = Math.sqrt(dx * dx + dz * dz);
+        
+        if (dist2D < 7) {
             bossHP--;
             
             boss.material.color.setHex(0xffffff);
@@ -569,22 +575,29 @@ function updateCombatLogic(time) {
         boss.position.y = 2.5 + Math.sin(time * 2) * 0.5;
         boss.rotation.y += 0.01;
 
-        // Check if player is touching/inside the boss cube
-        if (!isDead && player.position.distanceTo(boss.position) < 3.5) {
+        // FLAT 2D DISTANCE CHECK: Ignores Y-axis height entirely so they can't hide inside!
+        const dx = player.position.x - boss.position.x;
+        const dz = player.position.z - boss.position.z;
+        const dist2D = Math.sqrt(dx * dx + dz * dz);
+
+        // Cube is 5x5 (radius 2.5). Add 0.7 for player body thickness = 3.2
+        if (!isDead && dist2D < 3.2) {
             playerHP--;
             updateCombatUI();
             
             if (playerHP <= 0) {
                 triggerDeath();
             } else {
-                // Knockback Math: Push the player away from the center of the boss
-                const dx = player.position.x - boss.position.x;
-                const dz = player.position.z - boss.position.z;
-                const length = Math.sqrt(dx * dx + dz * dz) || 1; // Prevent divide by zero
+                // Aggressive Knockback: Push player away based on their angle to the boss
+                const pushForce = 5; 
+                if (dist2D === 0) {
+                    player.position.z += pushForce; 
+                } else {
+                    player.position.x += (dx / dist2D) * pushForce;
+                    player.position.z += (dz / dist2D) * pushForce;
+                }
                 
-                player.position.x += (dx / length) * 4; // Push back 4 units
-                player.position.z += (dz / length) * 4;
-                player.position.y += 2; // Pop them up into the air
+                player.position.y += 3; // Pop them up into the air
                 velocityY = 0;
                 
                 statusEl.innerText = "OUCH! Don't touch the Boss!";
