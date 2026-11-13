@@ -29,7 +29,6 @@ bossTheme.loop = true;
 let musicEnabled = true;
 const volumeSlider = document.getElementById('volume-slider');
 
-// Base volume mix (so they stay balanced against each other)
 const baseParkourVol = 0.6; 
 const baseBossVol = 1.0; 
 
@@ -39,9 +38,10 @@ function updateVolume() {
     bossTheme.volume = masterVol * baseBossVol;
 }
 
-// Listen for slider movement
-volumeSlider.addEventListener('input', updateVolume);
-updateVolume(); // Set it right away on load
+if (volumeSlider) {
+    volumeSlider.addEventListener('input', updateVolume);
+    updateVolume(); 
+}
 
 function manageMusic() {
     if (!musicEnabled) {
@@ -113,21 +113,23 @@ document.body.appendChild(combatUI);
 const victoryReturnUI = document.getElementById('victory-return');
 
 // --- VICTORY BUTTON LOGIC ---
-document.getElementById('return-btn').addEventListener('click', async () => {
-    victoryReturnUI.style.display = "none";
-    buildParkourLevel(); 
-    
-    currentSpawn = { x: 0, y: 1, z: 0 };
-    currentPlatformId = -1;
-    player.position.set(currentSpawn.x, currentSpawn.y, currentSpawn.z);
-    velocityY = 0;
-    
-    statusEl.innerText = "Saving return progress...";
-    statusEl.style.color = "#ffff00";
-    await saveGameData();
-    statusEl.innerText = "Returned to Start!";
-    statusEl.style.color = "#00ff88";
-});
+if (victoryReturnUI) {
+    document.getElementById('return-btn').addEventListener('click', async () => {
+        victoryReturnUI.style.display = "none";
+        buildParkourLevel(); 
+        
+        currentSpawn = { x: 0, y: 1, z: 0 };
+        currentPlatformId = -1;
+        player.position.set(currentSpawn.x, currentSpawn.y, currentSpawn.z);
+        velocityY = 0;
+        
+        statusEl.innerText = "Saving return progress...";
+        statusEl.style.color = "#ffff00";
+        await saveGameData();
+        statusEl.innerText = "Returned to Start!";
+        statusEl.style.color = "#00ff88";
+    });
+}
 
 // --- UI SLIDE MENU & AUTO-LOAD LOGIC ---
 document.getElementById('settings-toggle').addEventListener('click', () => document.getElementById('ui-container').classList.toggle('open'));
@@ -525,28 +527,42 @@ function attemptPunch() {
     }
 }
 
+// FULLY UPDATED DEATH TRIGGER 
 function triggerDeath() {
     if (isDead) return;
     isDead = true;
     statusEl.innerText = "You died! Restarting arena...";
     statusEl.style.color = "#ff4444";
     
+    // Stop all other movement animations instantly
     if (mixer) mixer.stopAllAction(); 
     
     if (deathAction) {
+        // Enforce the animation to play fully, set the weight to 100%, and stick to the ground
         deathAction.reset();
+        deathAction.setEffectiveTimeScale(1);
+        deathAction.setEffectiveWeight(1);
         deathAction.play();
+        
+        // Wait 4 full seconds to let the player watch their character hit the ground
         setTimeout(() => { 
-            if (currentLevel === 2) buildBossLevel(); 
-            else {
+            if (currentLevel === 2) {
+                buildBossLevel(); 
+            } else {
                 isDead = false; 
-                if (idleAction) { deathAction.stop(); idleAction.play(); }
+                if (idleAction) { 
+                    deathAction.stop(); 
+                    idleAction.play(); 
+                }
                 statusEl.innerText = "Character Ready!";
                 statusEl.style.color = "#00ff88";
             }
-        }, 3000);
+        }, 4000);
     } else {
-        if (currentLevel === 2) buildBossLevel(); 
+        // Fallback if the character has no death animation built-in
+        setTimeout(() => {
+            if (currentLevel === 2) buildBossLevel(); 
+        }, 2000);
     }
 }
 
@@ -596,6 +612,7 @@ function updatePhysics() {
     if (!currentModel) return;
     let isMoving = false;
 
+    // Movement is disabled while dying, but gravity still pulls the body down safely
     if (!isDead && !isPunching) {
         if (keys['KeyW'] || keys['ArrowUp']) { player.position.z -= moveSpeed; player.rotation.y = Math.PI; isMoving = true; }
         if (keys['KeyS'] || keys['ArrowDown']) { player.position.z += moveSpeed; player.rotation.y = 0; isMoving = true; }
