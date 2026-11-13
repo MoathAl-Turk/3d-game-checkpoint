@@ -4,14 +4,13 @@ import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "firebase/auth";
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// TODO: Paste your actual Firebase config here
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCe3tkeCGCaxg6P5YAWtyuPFTGt02a6QZQ",
+  authDomain: "d-game-checkpoints.firebaseapp.com",
+  projectId: "d-game-checkpoints",
+  storageBucket: "d-game-checkpoints.firebasestorage.app",
+  messagingSenderId: "68575491787",
+  appId: "1:68575491787:web:1811cbf860460b55ddcd4e"
 };
 
 const app = initializeApp(firebaseConfig);
