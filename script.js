@@ -5,12 +5,12 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signO
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCe3tkeCGCaxg6P5YAWtyuPFTGt02a6QZQ",
-  authDomain: "d-game-checkpoints.firebaseapp.com",
-  projectId: "d-game-checkpoints",
-  storageBucket: "d-game-checkpoints.firebasestorage.app",
-  messagingSenderId: "68575491787",
-  appId: "1:68575491787:web:1811cbf860460b55ddcd4e"
+  apiKey: "AIzaSyCe3tkeCGCaxg6P5YAWtyuPFTGt02a6QZQ",
+  authDomain: "d-game-checkpoints.firebaseapp.com",
+  projectId: "d-game-checkpoints",
+  storageBucket: "d-game-checkpoints.firebasestorage.app",
+  messagingSenderId: "68575491787",
+  appId: "1:68575491787:web:1811cbf860460b55ddcd4e"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -18,6 +18,36 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 let currentUserId = null;
+
+// --- ECONOMY & SHOP SYSTEM ---
+let playerCash = 0;
+let unlockedCharacters = ["Casual_Male.gltf"]; // Always start with this one
+
+const characterRoster = [
+    { path: "Casual_Male.gltf", name: "Casual Male", cost: 0 },
+    { path: "Casual_Female.gltf", name: "Casual Female", cost: 200 },
+    { path: "Pirate_Male.gltf", name: "Pirate Male", cost: 300 },
+    { path: "Pirate_Female.gltf", name: "Pirate Female", cost: 400 },
+    { path: "Zombie_Male.gltf", name: "Zombie Male", cost: 500 }
+];
+
+function updateShopUI() {
+    document.getElementById('cash-display').innerText = `Cash: $${playerCash}`;
+    const select = document.getElementById('char-select');
+    select.innerHTML = ''; 
+    
+    characterRoster.forEach(char => {
+        const option = document.createElement('option');
+        option.value = char.path;
+        if (unlockedCharacters.includes(char.path)) {
+            option.innerText = `${char.name} (Owned)`;
+        } else {
+            option.innerText = `${char.name} ($${char.cost})`;
+        }
+        select.appendChild(option);
+    });
+    select.value = currentModelPath; 
+}
 
 // --- COMBAT UI ---
 const combatUI = document.createElement('div');
@@ -222,6 +252,7 @@ let currentModelPath = "Casual_Male.gltf";
 function loadCharacter(modelPath, spawnPos = currentSpawn) {
     if (currentModel) player.remove(currentModel);
     currentModelPath = modelPath;
+    
     loader.load(modelPath, (gltf) => {
         currentModel = gltf.scene;
         player.add(currentModel);
@@ -232,7 +263,6 @@ function loadCharacter(modelPath, spawnPos = currentSpawn) {
             mixer = new THREE.AnimationMixer(currentModel);
             idleAction = null; walkAction = null; punchAction = null; deathAction = null;
             
-            // Bulletproof search (ignores caps and spaces)
             gltf.animations.forEach((clip) => {
                 const n = clip.name.toLowerCase().trim();
                 if (n === 'idle') idleAction = mixer.clipAction(clip);
@@ -243,24 +273,47 @@ function loadCharacter(modelPath, spawnPos = currentSpawn) {
             
             if (!idleAction) idleAction = mixer.clipAction(gltf.animations[0]);
             
-            // Force Punch and Death to only play exactly ONE time
             if (punchAction) punchAction.setLoop(THREE.LoopOnce, 1);
             if (deathAction) {
                 deathAction.setLoop(THREE.LoopOnce, 1);
-                deathAction.clampWhenFinished = true; // Stay on the ground!
+                deathAction.clampWhenFinished = true; 
             }
             
             idleAction.play();
         }
     });
 }
-document.getElementById('char-select').addEventListener('change', (e) => loadCharacter(e.target.value, player.position));
+updateShopUI(); // Initialize shop visually
+loadCharacter(currentModelPath);
+
+// --- SHOP LOGIC (Dropdown Change) ---
+document.getElementById('char-select').addEventListener('change', (e) => {
+    const selectedPath = e.target.value;
+    const charData = characterRoster.find(c => c.path === selectedPath);
+
+    if (unlockedCharacters.includes(selectedPath)) {
+        // Already own it, just switch
+        loadCharacter(selectedPath, player.position);
+    } else {
+        // Try to buy it
+        if (playerCash >= charData.cost) {
+            playerCash -= charData.cost;
+            unlockedCharacters.push(selectedPath);
+            updateShopUI(); // Update texts to say "(Owned)"
+            loadCharacter(selectedPath, player.position);
+            statusEl.innerText = `Bought ${charData.name}!`;
+            saveGameData(); // Auto-save purchase
+        } else {
+            statusEl.innerText = `Need $${charData.cost - playerCash} more to buy!`;
+            e.target.value = currentModelPath; // Revert dropdown
+        }
+    }
+});
 
 // --- ACTION TRIGGERS ---
 function attemptPunch() {
-    if (isDead || isPunching) return; // Unlocked! You can now punch ANYWHERE!
+    if (isDead || isPunching) return; 
     
-    // Play Punch Animation 
     if (punchAction && mixer) {
         isPunching = true;
         if (walkAction) walkAction.stop();
@@ -269,7 +322,6 @@ function attemptPunch() {
         punchAction.reset();
         punchAction.play();
         
-        // Return to idle after punch finishes
         setTimeout(() => { 
             isPunching = false; 
             if (!isDead && idleAction) {
@@ -279,11 +331,9 @@ function attemptPunch() {
         }, 800); 
     }
 
-    // ONLY process damage if fighting the Boss in Level 2
     if (currentLevel === 2 && boss) {
         if (player.position.distanceTo(boss.position) < 7) {
             bossHP--;
-            updateCombatUI();
             
             boss.material.color.setHex(0xffffff);
             setTimeout(() => { if(boss) boss.material.color.setHex(0xaa0000); }, 150);
@@ -293,7 +343,15 @@ function attemptPunch() {
                 boss = null;
                 meteors.forEach(m => scene.remove(m)); 
                 meteors.length = 0;
-                combatUI.innerHTML = "<span style='color:#00ff88; font-size:30px;'>BOSS DEFEATED! YOU WIN!</span>";
+                
+                // BOSS KILL REWARD!
+                playerCash += 100;
+                updateShopUI();
+                saveGameData(); // Auto-save earnings
+                
+                combatUI.innerHTML = "<span style='color:#00ff88; font-size:30px;'>BOSS DEFEATED! +$100</span>";
+            } else {
+                updateCombatUI();
             }
         } else {
             statusEl.innerText = "Too far to punch!";
@@ -306,17 +364,14 @@ function triggerDeath() {
     isDead = true;
     statusEl.innerText = "You died! Restarting arena...";
     
-    if (mixer) mixer.stopAllAction(); // Stop walking/idling
+    if (mixer) mixer.stopAllAction(); 
     
     if (deathAction) {
         deathAction.reset();
         deathAction.play();
-        
-        // Wait 3 seconds to watch the death animation, then respawn
         setTimeout(() => { 
             if (currentLevel === 2) buildBossLevel(); 
             else {
-                // If you test this in Level 1, it just wakes you back up
                 isDead = false; 
                 if (idleAction) { deathAction.stop(); idleAction.play(); }
             }
@@ -332,7 +387,7 @@ const keys = {};
 window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
     if (e.code === 'KeyE') attemptPunch();
-    if (e.code === 'KeyK') triggerDeath(); // SECRET TEST BUTTON!
+    if (e.code === 'KeyK') triggerDeath(); 
 }); 
 window.addEventListener('keyup', (e) => keys[e.code] = false);
 
@@ -405,6 +460,12 @@ function updatePhysics() {
         if (landedPlatform && currentPlatformId !== landedPlatform.id) {
             currentPlatformId = landedPlatform.id;
             if (landedPlatform.isGoal) {
+                // PARKOUR REWARD!
+                playerCash += 50;
+                updateShopUI();
+                statusEl.innerText = "Reached the Arena! +$50";
+                saveGameData();
+                
                 buildBossLevel();
                 return; 
             } else {
@@ -509,7 +570,6 @@ function animate() {
 }
 
 buildParkourLevel();
-loadCharacter(currentModelPath);
 animate();
 
 window.addEventListener('resize', () => {
@@ -518,19 +578,26 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// --- FIREBASE SAVE & LOAD ---
-document.getElementById('save-btn').addEventListener('click', async () => {
+// --- FIREBASE SAVE & LOAD CORE ---
+async function saveGameData() {
     if (!currentUserId || !currentModel) return;
-    statusEl.innerText = "Saving to cloud...";
     try {
         const saveRef = doc(db, "game_saves", currentUserId);
         await setDoc(saveRef, {
             x: player.position.x, y: player.position.y, z: player.position.z,
-            model: currentModelPath, level: currentLevel,
+            model: currentModelPath, 
+            level: currentLevel,
+            cash: playerCash,
+            unlocked: unlockedCharacters,
             lastUpdated: new Date().toISOString()
         }, { merge: true });
-        statusEl.innerText = `Saved Checkpoint (Level ${currentLevel})!`;
-    } catch (error) { statusEl.innerText = "Save failed."; }
+    } catch (error) { console.error("Save failed:", error); }
+}
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+    statusEl.innerText = "Saving to cloud...";
+    await saveGameData();
+    statusEl.innerText = `Saved Checkpoint!`;
 });
 
 document.getElementById('load-btn').addEventListener('click', async () => {
@@ -541,6 +608,11 @@ document.getElementById('load-btn').addEventListener('click', async () => {
         const docSnap = await getDoc(saveRef);
         if (docSnap.exists()) {
             const data = docSnap.data();
+            
+            // Restore Economy
+            playerCash = data.cash || 0;
+            unlockedCharacters = data.unlocked || ["Casual_Male.gltf"];
+            updateShopUI();
             
             if (data.level === 2) buildBossLevel();
             else buildParkourLevel();
