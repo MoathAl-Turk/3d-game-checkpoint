@@ -19,6 +19,47 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 let currentUserId = null;
 
+// --- AUDIO & MUSIC SYSTEM ---
+const parkourTheme = new Audio('sigmamusicart-space-space-music-597916.mp3');
+parkourTheme.loop = true;
+parkourTheme.volume = 0.3; // Chill volume
+
+const bossTheme = new Audio('leberch-cyberpunk-drone-375259.mp3');
+bossTheme.loop = true;
+bossTheme.volume = 0.5; // Louder, menacing volume
+
+let musicEnabled = true;
+
+function manageMusic() {
+    if (!musicEnabled) {
+        parkourTheme.pause();
+        bossTheme.pause();
+        return;
+    }
+    
+    if (currentLevel === 1) {
+        bossTheme.pause();
+        bossTheme.currentTime = 0; 
+        parkourTheme.play().catch(e => console.log("Audio waiting for interaction..."));
+    } else if (currentLevel === 2) {
+        parkourTheme.pause();
+        parkourTheme.currentTime = 0; 
+        bossTheme.play().catch(e => console.log("Audio waiting for interaction..."));
+    }
+}
+
+document.getElementById('music-toggle').addEventListener('click', (e) => {
+    musicEnabled = !musicEnabled;
+    if (musicEnabled) {
+        e.target.innerText = "🔊 Music: ON";
+        e.target.classList.remove('muted');
+    } else {
+        e.target.innerText = "🔇 Music: OFF";
+        e.target.classList.add('muted');
+    }
+    manageMusic();
+});
+
 // --- ECONOMY & SHOP SYSTEM ---
 let playerCash = 0;
 let unlockedCharacters = ["Casual_Male.gltf"]; 
@@ -61,7 +102,7 @@ const victoryReturnUI = document.getElementById('victory-return');
 // --- VICTORY BUTTON LOGIC ---
 document.getElementById('return-btn').addEventListener('click', async () => {
     victoryReturnUI.style.display = "none";
-    buildParkourLevel();
+    buildParkourLevel(); 
     
     currentSpawn = { x: 0, y: 1, z: 0 };
     currentPlatformId = -1;
@@ -135,16 +176,19 @@ document.getElementById('logout-btn').addEventListener('click', () => signOut(au
 // --- STARTUP / CONTROL SELECTION LOGIC ---
 const startupPrompt = document.getElementById('startup-prompt');
 const mobileControls = document.getElementById('mobile-controls');
+
 if (document.getElementById('choose-pc')) {
     document.getElementById('choose-pc').addEventListener('click', () => {
         startupPrompt.style.display = 'none';
         mobileControls.style.display = 'none';
+        manageMusic(); 
     });
 }
 if (document.getElementById('choose-mobile')) {
     document.getElementById('choose-mobile').addEventListener('click', () => {
         startupPrompt.style.display = 'none';
         mobileControls.style.display = 'block';
+        manageMusic(); 
     });
 }
 
@@ -211,6 +255,8 @@ function buildParkourLevel() {
     createPlatform(0, 3, -40, 8, 8, 0xffaa00);           
     createPlatform(-8, 4, -48, 4, 4, 0x2255aa);          
     createPlatform(0, 4, -60, 8, 8, 0xffff00, true); 
+    
+    manageMusic(); 
 }
 
 // --- BOSS COMBAT VARIABLES ---
@@ -265,6 +311,8 @@ function buildBossLevel() {
         idleAction.reset();
         idleAction.play();
     }
+    
+    manageMusic(); 
 }
 
 function updateCombatUI() {
@@ -452,6 +500,7 @@ function attemptPunch() {
                 combatUI.innerHTML = "<span style='color:#00ff88; font-size:30px;'>BOSS DEFEATED! +$100</span>";
                 
                 if (victoryReturnUI) victoryReturnUI.style.display = "block";
+                bossTheme.pause();
 
             } else {
                 updateCombatUI();
@@ -719,14 +768,10 @@ window.addEventListener('resize', () => {
 
 // --- FIREBASE SAVE & LOAD CORE ---
 async function saveGameData() {
-    // CRITICAL FIX: Removed the `!currentModel` check!
-    // Now it will reliably save your cash/inventory even if the 3D model is currently downloading!
     if (!currentUserId) return; 
     
     try {
         const saveRef = doc(db, "game_saves", currentUserId);
-        
-        // Grab player coordinates safely just in case they are missing
         const pX = player ? player.position.x : 0;
         const pY = player ? player.position.y : 1;
         const pZ = player ? player.position.z : 0;
