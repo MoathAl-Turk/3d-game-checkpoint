@@ -54,21 +54,58 @@ const combatUI = document.createElement('div');
 combatUI.style.cssText = "position:absolute; top:20px; left:50%; transform:translateX(-50%); color:#ff4444; font-size:24px; font-weight:bold; text-shadow: 2px 2px 0 #000; display:none; text-align:center; z-index:5; pointer-events:none; width: 90%;";
 document.body.appendChild(combatUI);
 
-// --- UI SLIDE MENU LOGIC ---
+// --- UI SLIDE MENU & AUTO-LOAD LOGIC ---
 document.getElementById('settings-toggle').addEventListener('click', () => document.getElementById('ui-container').classList.toggle('open'));
 const statusEl = document.getElementById('status');
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUserId = user.uid;
         document.getElementById('user-info').innerText = `Logged in as: ${user.displayName}`;
         document.getElementById('login-btn').style.display = 'none';
         document.getElementById('logout-btn').style.display = 'block';
+        
+        // AUTO-LOAD DATA ON LOGIN/REFRESH
+        statusEl.innerText = "Syncing account...";
+        statusEl.style.color = "#ffff00";
+        try {
+            const saveRef = doc(db, "game_saves", currentUserId);
+            const docSnap = await getDoc(saveRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                
+                playerCash = data.cash || 0;
+                unlockedCharacters = data.unlocked || ["Casual_Male.gltf"];
+                updateShopUI();
+                
+                if (data.level === 2) buildBossLevel();
+                else buildParkourLevel();
+                
+                currentSpawn = { x: data.x, y: data.y, z: data.z }; 
+                currentPlatformId = -1; 
+                loadCharacter(data.model || "Casual_Male.gltf", currentSpawn);
+                
+                statusEl.innerText = "Account synced!";
+                statusEl.style.color = "#00ff88";
+            } else {
+                statusEl.innerText = "New account ready!";
+                statusEl.style.color = "#00ff88";
+            }
+        } catch (error) { 
+            statusEl.innerText = "Failed to sync account.";
+            statusEl.style.color = "#ff4444";
+        }
+        
     } else {
         currentUserId = null;
         document.getElementById('user-info').innerText = 'Not logged in';
         document.getElementById('login-btn').style.display = 'block';
         document.getElementById('logout-btn').style.display = 'none';
+        
+        // Reset to defaults if logged out
+        playerCash = 0;
+        unlockedCharacters = ["Casual_Male.gltf"];
+        updateShopUI();
     }
 });
 document.getElementById('login-btn').addEventListener('click', () => signInWithPopup(auth, provider));
@@ -348,7 +385,7 @@ function attemptPunch() {
     }
 
     if (currentLevel === 2 && boss) {
-        // Flat 2D check for punching (can reach up to 7 units away)
+        // Flat 2D check for punching
         const dx = player.position.x - boss.position.x;
         const dz = player.position.z - boss.position.z;
         const dist2D = Math.sqrt(dx * dx + dz * dz);
@@ -574,12 +611,11 @@ function updateCombatLogic(time) {
         boss.position.y = 2.5 + Math.sin(time * 2) * 0.5;
         boss.rotation.y += 0.01;
 
-        // FLAT 2D DISTANCE CHECK: Ignores Y-axis height entirely so they can't hide inside!
+        // FLAT 2D DISTANCE CHECK for body collision
         const dx = player.position.x - boss.position.x;
         const dz = player.position.z - boss.position.z;
         const dist2D = Math.sqrt(dx * dx + dz * dz);
 
-        // Cube is 5x5 (radius 2.5). Add 0.7 for player body thickness = 3.2
         if (!isDead && dist2D < 3.2) {
             playerHP--;
             updateCombatUI();
@@ -587,7 +623,7 @@ function updateCombatLogic(time) {
             if (playerHP <= 0) {
                 triggerDeath();
             } else {
-                // Aggressive Knockback: Push player away based on their angle to the boss
+                // Aggressive Knockback
                 const pushForce = 5; 
                 if (dist2D === 0) {
                     player.position.z += pushForce; 
@@ -650,6 +686,7 @@ async function saveGameData() {
     } catch (error) { console.error("Save failed:", error); }
 }
 
+// Manual Save/Load buttons as backups
 document.getElementById('save-btn').addEventListener('click', async () => {
     statusEl.innerText = "Saving to cloud...";
     statusEl.style.color = "#ffff00";
