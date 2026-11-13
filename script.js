@@ -22,6 +22,7 @@ let currentUserId = null;
 // --- ECONOMY & SHOP SYSTEM ---
 let playerCash = 0;
 let unlockedCharacters = ["Casual_Male.gltf"]; 
+let currentModelPath = "Casual_Male.gltf";
 
 const characterRoster = [
     { path: "Casual_Male.gltf", name: "Casual Male", cost: 0 },
@@ -46,6 +47,8 @@ function updateShopUI() {
         }
         select.appendChild(option);
     });
+    
+    // Select the currently equipped character in the dropdown
     select.value = currentModelPath; 
 }
 
@@ -65,7 +68,6 @@ onAuthStateChanged(auth, async (user) => {
         document.getElementById('login-btn').style.display = 'none';
         document.getElementById('logout-btn').style.display = 'block';
         
-        // AUTO-LOAD DATA ON LOGIN/REFRESH
         statusEl.innerText = "Syncing account...";
         statusEl.style.color = "#ffff00";
         try {
@@ -74,16 +76,18 @@ onAuthStateChanged(auth, async (user) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 
+                // CRITICAL FIX: Set current model BEFORE updating the UI so it doesn't overwrite!
+                currentModelPath = data.model || "Casual_Male.gltf";
                 playerCash = data.cash || 0;
                 unlockedCharacters = data.unlocked || ["Casual_Male.gltf"];
-                updateShopUI();
+                updateShopUI(); 
                 
                 if (data.level === 2) buildBossLevel();
                 else buildParkourLevel();
                 
                 currentSpawn = { x: data.x, y: data.y, z: data.z }; 
                 currentPlatformId = -1; 
-                loadCharacter(data.model || "Casual_Male.gltf", currentSpawn);
+                loadCharacter(currentModelPath, currentSpawn);
                 
                 statusEl.innerText = "Account synced!";
                 statusEl.style.color = "#00ff88";
@@ -102,9 +106,9 @@ onAuthStateChanged(auth, async (user) => {
         document.getElementById('login-btn').style.display = 'block';
         document.getElementById('logout-btn').style.display = 'none';
         
-        // Reset to defaults if logged out
         playerCash = 0;
         unlockedCharacters = ["Casual_Male.gltf"];
+        currentModelPath = "Casual_Male.gltf";
         updateShopUI();
     }
 });
@@ -286,7 +290,6 @@ let currentModel = null, mixer = null;
 let idleAction = null, walkAction = null, punchAction = null, deathAction = null;
 const clock = new THREE.Clock(); 
 const loader = new GLTFLoader();
-let currentModelPath = "Casual_Male.gltf";
 
 function loadCharacter(modelPath, spawnPos = currentSpawn) {
     if (currentModel) {
@@ -340,25 +343,42 @@ updateShopUI();
 loadCharacter(currentModelPath);
 
 // --- SHOP LOGIC ---
-document.getElementById('char-select').addEventListener('change', (e) => {
+document.getElementById('char-select').addEventListener('change', async (e) => {
     const selectedPath = e.target.value;
     const charData = characterRoster.find(c => c.path === selectedPath);
 
     if (unlockedCharacters.includes(selectedPath)) {
+        currentModelPath = selectedPath; // Equip it
+        updateShopUI();
         loadCharacter(selectedPath, player.position);
+        
+        statusEl.innerText = `Equipped! Saving to Cloud...`;
+        statusEl.style.color = "#ffff00";
+        await saveGameData(); // Save the equipment change
+        statusEl.innerText = `Saved to Cloud!`;
+        statusEl.style.color = "#00ff88";
     } else {
+        // Buy Logic
         if (playerCash >= charData.cost) {
             playerCash -= charData.cost;
             unlockedCharacters.push(selectedPath);
+            currentModelPath = selectedPath; // Equip immediately
+            
             updateShopUI(); 
             loadCharacter(selectedPath, player.position);
-            statusEl.innerText = `Bought ${charData.name}!`;
+            
+            statusEl.innerText = `Buying ${charData.name}... Saving to Cloud...`;
+            statusEl.style.color = "#ffff00";
+            
+            // Force the game to pause and await the cloud save
+            await saveGameData(); 
+            
+            statusEl.innerText = `Purchase Saved to Cloud!`;
             statusEl.style.color = "#00ff88";
-            saveGameData(); 
         } else {
             statusEl.innerText = `Need $${charData.cost - playerCash} more to buy!`;
             statusEl.style.color = "#ff4444";
-            e.target.value = currentModelPath; 
+            e.target.value = currentModelPath; // Bounce back to the equipped character
         }
     }
 });
@@ -385,7 +405,6 @@ function attemptPunch() {
     }
 
     if (currentLevel === 2 && boss) {
-        // Flat 2D check for punching
         const dx = player.position.x - boss.position.x;
         const dz = player.position.z - boss.position.z;
         const dist2D = Math.sqrt(dx * dx + dz * dz);
@@ -404,7 +423,13 @@ function attemptPunch() {
                 
                 playerCash += 100;
                 updateShopUI();
-                saveGameData(); 
+                
+                statusEl.innerText = "Saving Boss Reward...";
+                statusEl.style.color = "#ffff00";
+                saveGameData().then(() => {
+                    statusEl.innerText = "Boss Reward Saved!";
+                    statusEl.style.color = "#00ff88";
+                }); 
                 
                 combatUI.innerHTML = "<span style='color:#00ff88; font-size:30px;'>BOSS DEFEATED! +$100</span>";
             } else {
@@ -523,9 +548,13 @@ function updatePhysics() {
             if (landedPlatform.isGoal) {
                 playerCash += 50;
                 updateShopUI();
-                statusEl.innerText = "Reached the Arena! +$50";
-                statusEl.style.color = "#00ff88";
-                saveGameData();
+                
+                statusEl.innerText = "Saving Arena Cash...";
+                statusEl.style.color = "#ffff00";
+                saveGameData().then(() => {
+                    statusEl.innerText = "Arena Cash Saved!";
+                    statusEl.style.color = "#00ff88";
+                });
                 
                 buildBossLevel();
                 return; 
@@ -606,12 +635,10 @@ function updateCombatLogic(time) {
         }
     }
     
-    // Boss Floating & Body Collision
     if (boss) {
         boss.position.y = 2.5 + Math.sin(time * 2) * 0.5;
         boss.rotation.y += 0.01;
 
-        // FLAT 2D DISTANCE CHECK for body collision
         const dx = player.position.x - boss.position.x;
         const dz = player.position.z - boss.position.z;
         const dist2D = Math.sqrt(dx * dx + dz * dz);
@@ -623,7 +650,6 @@ function updateCombatLogic(time) {
             if (playerHP <= 0) {
                 triggerDeath();
             } else {
-                // Aggressive Knockback
                 const pushForce = 5; 
                 if (dist2D === 0) {
                     player.position.z += pushForce; 
@@ -632,7 +658,7 @@ function updateCombatLogic(time) {
                     player.position.z += (dz / dist2D) * pushForce;
                 }
                 
-                player.position.y += 3; // Pop them up into the air
+                player.position.y += 3; 
                 velocityY = 0;
                 
                 statusEl.innerText = "OUCH! Don't touch the Boss!";
@@ -686,7 +712,6 @@ async function saveGameData() {
     } catch (error) { console.error("Save failed:", error); }
 }
 
-// Manual Save/Load buttons as backups
 document.getElementById('save-btn').addEventListener('click', async () => {
     statusEl.innerText = "Saving to cloud...";
     statusEl.style.color = "#ffff00";
@@ -705,6 +730,8 @@ document.getElementById('load-btn').addEventListener('click', async () => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             
+            // Re-sync current model BEFORE updating the UI to prevent dropdown override!
+            currentModelPath = data.model || "Casual_Male.gltf";
             playerCash = data.cash || 0;
             unlockedCharacters = data.unlocked || ["Casual_Male.gltf"];
             updateShopUI();
@@ -714,7 +741,7 @@ document.getElementById('load-btn').addEventListener('click', async () => {
             
             currentSpawn = { x: data.x, y: data.y, z: data.z }; 
             currentPlatformId = -1; 
-            loadCharacter(data.model || "Casual_Male.gltf", currentSpawn);
+            loadCharacter(currentModelPath, currentSpawn);
             
             statusEl.innerText = "Loaded cloud checkpoint!";
             statusEl.style.color = "#00ff88";
