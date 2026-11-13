@@ -22,13 +22,26 @@ let currentUserId = null;
 // --- AUDIO & MUSIC SYSTEM ---
 const parkourTheme = new Audio('sigmamusicart-space-space-music-597916.mp3');
 parkourTheme.loop = true;
-parkourTheme.volume = 0.3; // Chill volume
 
 const bossTheme = new Audio('leberch-cyberpunk-drone-375259.mp3');
 bossTheme.loop = true;
-bossTheme.volume = 0.5; // Louder, menacing volume
 
 let musicEnabled = true;
+const volumeSlider = document.getElementById('volume-slider');
+
+// Base volume mix (so they stay balanced against each other)
+const baseParkourVol = 0.6; 
+const baseBossVol = 1.0; 
+
+function updateVolume() {
+    const masterVol = parseFloat(volumeSlider.value);
+    parkourTheme.volume = masterVol * baseParkourVol;
+    bossTheme.volume = masterVol * baseBossVol;
+}
+
+// Listen for slider movement
+volumeSlider.addEventListener('input', updateVolume);
+updateVolume(); // Set it right away on load
 
 function manageMusic() {
     if (!musicEnabled) {
