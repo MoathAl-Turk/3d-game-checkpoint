@@ -21,7 +21,7 @@ let currentUserId = null;
 
 // --- ECONOMY & SHOP SYSTEM ---
 let playerCash = 0;
-let unlockedCharacters = ["Casual_Male.gltf"]; // Always start with this one
+let unlockedCharacters = ["Casual_Male.gltf"]; 
 
 const characterRoster = [
     { path: "Casual_Male.gltf", name: "Casual Male", cost: 0 },
@@ -163,6 +163,7 @@ let lastMeteorTime = 0;
 function buildBossLevel() {
     currentLevel = 2;
     statusEl.innerText = "Entered the Red Moon Arena!";
+    statusEl.style.color = "#00ff88";
     isDead = false;
     isPunching = false;
     
@@ -213,6 +214,7 @@ function updateCombatUI() {
 function spawnMeteors() {
     if (isDead) return; 
     statusEl.innerText = "WARNING: METEORS INCOMING!";
+    statusEl.style.color = "#ff4444";
     for (let i = 0; i < 15; i++) {
         const geom = new THREE.SphereGeometry(0.8);
         const mat = new THREE.MeshBasicMaterial({ color: 0xff1100 }); 
@@ -250,8 +252,14 @@ const loader = new GLTFLoader();
 let currentModelPath = "Casual_Male.gltf";
 
 function loadCharacter(modelPath, spawnPos = currentSpawn) {
-    if (currentModel) player.remove(currentModel);
+    if (currentModel) {
+        player.remove(currentModel);
+        currentModel = null;
+    }
+    
     currentModelPath = modelPath;
+    statusEl.innerText = "Loading " + modelPath + "...";
+    statusEl.style.color = "#ffff00"; // Yellow
     
     loader.load(modelPath, (gltf) => {
         currentModel = gltf.scene;
@@ -259,7 +267,7 @@ function loadCharacter(modelPath, spawnPos = currentSpawn) {
         player.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
         velocityY = 0;
         
-        if (gltf.animations.length > 0) {
+        if (gltf.animations && gltf.animations.length > 0) {
             mixer = new THREE.AnimationMixer(currentModel);
             idleAction = null; walkAction = null; punchAction = null; deathAction = null;
             
@@ -281,31 +289,39 @@ function loadCharacter(modelPath, spawnPos = currentSpawn) {
             
             idleAction.play();
         }
+        statusEl.innerText = "Character Ready!";
+        statusEl.style.color = "#00ff88"; // Green
+        
+    }, undefined, (error) => {
+        console.error("3D MODEL LOAD ERROR:", error);
+        statusEl.innerText = `❌ ERROR: Cannot load ${modelPath}!`;
+        statusEl.style.color = "#ff4444"; // Red
     });
 }
-updateShopUI(); // Initialize shop visually
+
+updateShopUI(); 
 loadCharacter(currentModelPath);
 
-// --- SHOP LOGIC (Dropdown Change) ---
+// --- SHOP LOGIC ---
 document.getElementById('char-select').addEventListener('change', (e) => {
     const selectedPath = e.target.value;
     const charData = characterRoster.find(c => c.path === selectedPath);
 
     if (unlockedCharacters.includes(selectedPath)) {
-        // Already own it, just switch
         loadCharacter(selectedPath, player.position);
     } else {
-        // Try to buy it
         if (playerCash >= charData.cost) {
             playerCash -= charData.cost;
             unlockedCharacters.push(selectedPath);
-            updateShopUI(); // Update texts to say "(Owned)"
+            updateShopUI(); 
             loadCharacter(selectedPath, player.position);
             statusEl.innerText = `Bought ${charData.name}!`;
-            saveGameData(); // Auto-save purchase
+            statusEl.style.color = "#00ff88";
+            saveGameData(); 
         } else {
             statusEl.innerText = `Need $${charData.cost - playerCash} more to buy!`;
-            e.target.value = currentModelPath; // Revert dropdown
+            statusEl.style.color = "#ff4444";
+            e.target.value = currentModelPath; 
         }
     }
 });
@@ -344,10 +360,9 @@ function attemptPunch() {
                 meteors.forEach(m => scene.remove(m)); 
                 meteors.length = 0;
                 
-                // BOSS KILL REWARD!
                 playerCash += 100;
                 updateShopUI();
-                saveGameData(); // Auto-save earnings
+                saveGameData(); 
                 
                 combatUI.innerHTML = "<span style='color:#00ff88; font-size:30px;'>BOSS DEFEATED! +$100</span>";
             } else {
@@ -355,6 +370,7 @@ function attemptPunch() {
             }
         } else {
             statusEl.innerText = "Too far to punch!";
+            statusEl.style.color = "#ffaa00";
         }
     }
 }
@@ -363,6 +379,7 @@ function triggerDeath() {
     if (isDead) return;
     isDead = true;
     statusEl.innerText = "You died! Restarting arena...";
+    statusEl.style.color = "#ff4444";
     
     if (mixer) mixer.stopAllAction(); 
     
@@ -374,6 +391,8 @@ function triggerDeath() {
             else {
                 isDead = false; 
                 if (idleAction) { deathAction.stop(); idleAction.play(); }
+                statusEl.innerText = "Character Ready!";
+                statusEl.style.color = "#00ff88";
             }
         }, 3000);
     } else {
@@ -460,10 +479,10 @@ function updatePhysics() {
         if (landedPlatform && currentPlatformId !== landedPlatform.id) {
             currentPlatformId = landedPlatform.id;
             if (landedPlatform.isGoal) {
-                // PARKOUR REWARD!
                 playerCash += 50;
                 updateShopUI();
                 statusEl.innerText = "Reached the Arena! +$50";
+                statusEl.style.color = "#00ff88";
                 saveGameData();
                 
                 buildBossLevel();
@@ -540,6 +559,7 @@ function updateCombatLogic(time) {
                 player.position.y += 2;
                 velocityY = 0;
                 statusEl.innerText = "OUCH! Hit by a meteor!";
+                statusEl.style.color = "#ffaa00";
             }
         }
     }
@@ -596,20 +616,22 @@ async function saveGameData() {
 
 document.getElementById('save-btn').addEventListener('click', async () => {
     statusEl.innerText = "Saving to cloud...";
+    statusEl.style.color = "#ffff00";
     await saveGameData();
     statusEl.innerText = `Saved Checkpoint!`;
+    statusEl.style.color = "#00ff88";
 });
 
 document.getElementById('load-btn').addEventListener('click', async () => {
     if (!currentUserId) return;
     statusEl.innerText = "Loading cloud checkpoint...";
+    statusEl.style.color = "#ffff00";
     try {
         const saveRef = doc(db, "game_saves", currentUserId);
         const docSnap = await getDoc(saveRef);
         if (docSnap.exists()) {
             const data = docSnap.data();
             
-            // Restore Economy
             playerCash = data.cash || 0;
             unlockedCharacters = data.unlocked || ["Casual_Male.gltf"];
             updateShopUI();
@@ -620,9 +642,15 @@ document.getElementById('load-btn').addEventListener('click', async () => {
             currentSpawn = { x: data.x, y: data.y, z: data.z }; 
             currentPlatformId = -1; 
             loadCharacter(data.model || "Casual_Male.gltf", currentSpawn);
+            
             statusEl.innerText = "Loaded cloud checkpoint!";
+            statusEl.style.color = "#00ff88";
         } else {
             statusEl.innerText = "No save found.";
+            statusEl.style.color = "#ff4444";
         }
-    } catch (error) { statusEl.innerText = "Load failed."; }
+    } catch (error) { 
+        statusEl.innerText = "Load failed.";
+        statusEl.style.color = "#ff4444";
+    }
 });
