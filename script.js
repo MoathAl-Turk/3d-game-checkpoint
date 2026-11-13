@@ -259,7 +259,7 @@ function loadCharacter(modelPath, spawnPos = currentSpawn) {
     
     currentModelPath = modelPath;
     statusEl.innerText = "Loading " + modelPath + "...";
-    statusEl.style.color = "#ffff00"; // Yellow
+    statusEl.style.color = "#ffff00"; 
     
     loader.load(modelPath, (gltf) => {
         currentModel = gltf.scene;
@@ -275,7 +275,7 @@ function loadCharacter(modelPath, spawnPos = currentSpawn) {
                 const n = clip.name.toLowerCase().trim();
                 if (n === 'idle') idleAction = mixer.clipAction(clip);
                 if (n === 'walk' || n === 'run') walkAction = mixer.clipAction(clip);
-                if (n === 'punch') punchAction = mixer.clipAction(clip);
+                if (n === 'punch' || n === 'attack') punchAction = mixer.clipAction(clip);
                 if (n === 'death' || n === 'defeat') deathAction = mixer.clipAction(clip);
             });
             
@@ -290,12 +290,12 @@ function loadCharacter(modelPath, spawnPos = currentSpawn) {
             idleAction.play();
         }
         statusEl.innerText = "Character Ready!";
-        statusEl.style.color = "#00ff88"; // Green
+        statusEl.style.color = "#00ff88"; 
         
     }, undefined, (error) => {
         console.error("3D MODEL LOAD ERROR:", error);
         statusEl.innerText = `❌ ERROR: Cannot load ${modelPath}!`;
-        statusEl.style.color = "#ff4444"; // Red
+        statusEl.style.color = "#ff4444"; 
     });
 }
 
@@ -564,9 +564,33 @@ function updateCombatLogic(time) {
         }
     }
     
+    // Boss Floating & Body Collision
     if (boss) {
         boss.position.y = 2.5 + Math.sin(time * 2) * 0.5;
         boss.rotation.y += 0.01;
+
+        // Check if player is touching/inside the boss cube
+        if (!isDead && player.position.distanceTo(boss.position) < 3.5) {
+            playerHP--;
+            updateCombatUI();
+            
+            if (playerHP <= 0) {
+                triggerDeath();
+            } else {
+                // Knockback Math: Push the player away from the center of the boss
+                const dx = player.position.x - boss.position.x;
+                const dz = player.position.z - boss.position.z;
+                const length = Math.sqrt(dx * dx + dz * dz) || 1; // Prevent divide by zero
+                
+                player.position.x += (dx / length) * 4; // Push back 4 units
+                player.position.z += (dz / length) * 4;
+                player.position.y += 2; // Pop them up into the air
+                velocityY = 0;
+                
+                statusEl.innerText = "OUCH! Don't touch the Boss!";
+                statusEl.style.color = "#ff4444";
+            }
+        }
     }
 }
 
