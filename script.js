@@ -63,7 +63,6 @@ document.getElementById('return-btn').addEventListener('click', async () => {
     victoryReturnUI.style.display = "none";
     buildParkourLevel();
     
-    // Reset player position safely to start
     currentSpawn = { x: 0, y: 1, z: 0 };
     currentPlatformId = -1;
     player.position.set(currentSpawn.x, currentSpawn.y, currentSpawn.z);
@@ -452,7 +451,6 @@ function attemptPunch() {
                 
                 combatUI.innerHTML = "<span style='color:#00ff88; font-size:30px;'>BOSS DEFEATED! +$100</span>";
                 
-                // POPUP THE VICTORY BUTTON
                 if (victoryReturnUI) victoryReturnUI.style.display = "block";
 
             } else {
@@ -721,11 +719,20 @@ window.addEventListener('resize', () => {
 
 // --- FIREBASE SAVE & LOAD CORE ---
 async function saveGameData() {
-    if (!currentUserId || !currentModel) return;
+    // CRITICAL FIX: Removed the `!currentModel` check!
+    // Now it will reliably save your cash/inventory even if the 3D model is currently downloading!
+    if (!currentUserId) return; 
+    
     try {
         const saveRef = doc(db, "game_saves", currentUserId);
+        
+        // Grab player coordinates safely just in case they are missing
+        const pX = player ? player.position.x : 0;
+        const pY = player ? player.position.y : 1;
+        const pZ = player ? player.position.z : 0;
+
         await setDoc(saveRef, {
-            x: player.position.x, y: player.position.y, z: player.position.z,
+            x: pX, y: pY, z: pZ,
             model: currentModelPath, 
             level: currentLevel,
             cash: playerCash,
