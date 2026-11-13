@@ -39,9 +39,11 @@
         
         #cash-display { color: #ffd700; font-size: 18px; font-weight: bold; margin: 10px 0; text-align: center; background: #222; padding: 5px; border-radius: 4px; border: 1px solid #444; }
 
-        /* Music Toggle Button Styling */
-        #music-toggle { background: #9d00ff; color: white; margin-bottom: 15px; }
+        /* Music Toggle Button & Slider Styling */
+        #music-toggle { background: #9d00ff; color: white; margin-bottom: 8px; }
         #music-toggle.muted { background: #555; color: #aaa; }
+        #volume-container { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+        #volume-slider { width: 75%; cursor: pointer; accent-color: #9d00ff; }
 
         #mobile-controls {
             display: none; 
@@ -134,6 +136,10 @@
             <div id="cash-display">Cash: $0</div>
             
             <button id="music-toggle">🔊 Music: ON</button>
+            <div id="volume-container">
+                <span style="font-size: 12px; color: #ccc;">Vol:</span>
+                <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5">
+            </div>
 
             <div style="margin-bottom: 15px;">
                 <label for="char-select" style="font-size: 13px; color: #ccc;">Character Shop:</label>
