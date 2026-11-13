@@ -39,6 +39,10 @@
         
         #cash-display { color: #ffd700; font-size: 18px; font-weight: bold; margin: 10px 0; text-align: center; background: #222; padding: 5px; border-radius: 4px; border: 1px solid #444; }
 
+        /* Music Toggle Button Styling */
+        #music-toggle { background: #9d00ff; color: white; margin-bottom: 15px; }
+        #music-toggle.muted { background: #555; color: #aaa; }
+
         #mobile-controls {
             display: none; 
             position: absolute; bottom: 20px; width: 100%; height: 100%;
@@ -60,7 +64,6 @@
         #action-pad { position: absolute; bottom: 30px; right: 20px; display: flex; gap: 15px; }
         #action-pad .m-btn { width: 70px; height: 70px; font-size: 24px; border-radius: 12px; }
 
-        /* --- NEW VICTORY RETURN POPUP --- */
         #victory-return {
             display: none; 
             position: absolute; 
@@ -73,7 +76,6 @@
             border: 2px solid #00ff88; 
             text-align: center;
         }
-        /* Push up on mobile so it doesn't cover the D-Pad */
         @media (max-width: 800px) {
             #victory-return { bottom: 230px; }
         }
@@ -130,6 +132,8 @@
             </div>
 
             <div id="cash-display">Cash: $0</div>
+            
+            <button id="music-toggle">🔊 Music: ON</button>
 
             <div style="margin-bottom: 15px;">
                 <label for="char-select" style="font-size: 13px; color: #ccc;">Character Shop:</label>
